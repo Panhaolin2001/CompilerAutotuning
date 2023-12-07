@@ -1,0 +1,142 @@
+from ..common import get_instrcount, Actions
+from .utility.torchUtils import MinMaxScaling
+from torch_geometric.data import Data
+import torch
+import copy
+
+class CompilerEnv:
+    def __init__(self, ll_file, max_steps=20, state_type='MLP'):
+        self.ll_file = ll_file
+        self.baseline_perf = get_instrcount(ll_file, "-Oz")
+        self.epsilon = 0
+        self.state_type = state_type
+        self.max_steps = max_steps
+        self.pass_features = MinMaxScaling(Actions, ll_file)
+        self.feature_dim = len(self.pass_features[next(iter(self.pass_features))]) + 1
+        self.n_act = len(Actions)
+        self.state = None
+        self.list = []
+
+    def update_graph_state(self, action):
+        '''
+        更新状态
+            1. GCN
+                获取每个pass的特征向量 -> 造新的特征值new_value并添加到特征向量中
+                -> 更新图的节点向量特征 -> 更新图的边特征
+            
+            2.  MLP
+                获取每个pass的特征向量 -> 造新的特征值new_value并添加到特征向量中
+                -> 更新节点向量特征(求均值)
+        '''
+        action_idx = list(Actions).index(action)
+        features = self.pass_features[action.name]
+        features_vector = torch.tensor([value for value in features.values() if isinstance(value, (int, float))], dtype=torch.float)
+        new_value = torch.tensor([(self.steps) / self.max_steps], dtype=torch.float)
+        features_vector = torch.cat((features_vector, new_value))
+
+        if self.state_type == "GCN":
+            self.state.x[self.steps] = features_vector
+            if self.steps >= 2:
+                new_edge = torch.tensor([[self.steps - 1], [self.steps]], dtype=torch.long)
+                self.state.edge_index = torch.cat([self.state.edge_index, new_edge], dim=1)
+
+        elif self.state_type == "MLP":
+            self.state += features_vector
+            self.state /= torch.tensor([self.steps], dtype=torch.float)
+
+        elif self.state_type == "GRNN":
+            data = copy.deepcopy(self.state[-1])
+            data.x[self.steps] = features_vector
+            if self.steps >= 1:
+                new_edge = torch.tensor([[self.steps - 1], [self.steps]], dtype=torch.long)
+                data.edge_index = torch.cat([data.edge_index, new_edge], dim=1)
+            self.datalist.append(data)
+            
+            # data = copy.deepcopy(self.state[-1])
+            # data.x = torch.cat([data.x, features_vector.unsqueeze(0)], dim=0)
+            # if self.steps >= 1:
+            #     new_edge = torch.tensor([[self.steps - 1], [self.steps]], dtype=torch.long)
+            #     data.edge_index = torch.cat([data.edge_index, new_edge], dim=1)
+            # self.datalist.append(data)
+        
+        elif self.state_type == "Transformer":
+            self.state[self.steps] = features_vector
+
+        elif self.state_type == "T-GCN":
+            # self.state.x[self.steps] = features_vector
+            # if self.steps >= 2:
+            #     new_edge = torch.tensor([[self.steps - 1], [self.steps]], dtype=torch.long)
+            #     self.state.edge_index = torch.cat([self.state.edge_index, new_edge], dim=1)
+            data = copy.deepcopy(self.state[-1])
+            data.x[self.steps] = features_vector
+            if self.steps >= 1:
+                new_edge = torch.tensor([[self.steps - 1], [self.steps]], dtype=torch.long)
+                data.edge_index = torch.cat([data.edge_index, new_edge], dim=1)
+            self.datalist.append(data)
+            
+    def step(self, action):
+        '''
+        1. applied_passes_set用于不要让后续的pass和前面的pass重复
+        2. reward设置为此次状态下的性能比baseline多了多少百分比
+        3. 设置done的结束条件为达到最大step数
+        '''
+        self.steps += 1
+        self.applied_passes.append(action)
+        self.applied_passes_set.add(action)
+        self.update_graph_state(action)
+
+        optimization_flags = "--enable-new-pm=0 " + " ".join([act.value for act in self.applied_passes])
+        current_perf = get_instrcount(self.ll_file, optimization_flags)
+        # self.reward = (self.baseline_perf / (current_perf + self.epsilon)) - 1
+        self.reward = (self.current_perf - current_perf) / self.baseline_perf
+        self.current_perf = current_perf
+
+        done = self.steps >= self.max_steps - 1 
+        return self.reward, copy.deepcopy(self.state), done
+
+    def reset(self):
+        '''
+        重置参数和状态
+        '''
+        self.reward = 0
+        self.steps = -1
+        self.current_perf = self.baseline_perf
+        self.applied_passes = []
+        self.datalist = []
+        self.applied_passes_set = set()
+        self.state = self.init_state()
+
+        return self.state
+
+    def init_state(self):
+        '''
+        初始化状态
+        '''
+        if self.state_type == "GCN":
+            x = torch.zeros((self.max_steps, self.feature_dim), dtype=torch.float)
+            edge_index = torch.empty((2, 0), dtype=torch.long)
+            return Data(x=x, edge_index=edge_index)
+        
+        elif self.state_type == "MLP":
+            return torch.zeros((self.feature_dim), dtype=torch.float)
+        
+        elif self.state_type == "GRNN":
+            x = torch.zeros((self.max_steps, self.feature_dim), dtype=torch.float)
+            edge_index = torch.empty((2, 0), dtype=torch.long)
+            data = Data(x=x, edge_index=edge_index)
+            self.datalist.append(data)
+            return self.datalist
+
+        elif self.state_type == "Transformer":
+            return torch.zeros((self.max_steps, self.feature_dim), dtype=torch.float)
+        
+        elif self.state_type == "T-GCN":
+            # x = torch.zeros((self.max_steps, self.feature_dim), dtype=torch.float)
+            # edge_index = torch.empty((2, 0), dtype=torch.long)
+            # return Data(x=x, edge_index=edge_index)
+        
+            x = torch.zeros((self.max_steps, self.feature_dim), dtype=torch.float)
+            edge_index = torch.empty((2, 0), dtype=torch.long)
+            data = Data(x=x, edge_index=edge_index)
+            self.datalist.append(data)
+            return self.datalist
