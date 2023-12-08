@@ -1,13 +1,22 @@
-from ..common import get_instrcount, Actions
+from ..common import get_instrcount, Actions, get_codesize, get_runtime_internal
 from .utility.torchUtils import MinMaxScaling
 from torch_geometric.data import Data
 import torch
 import copy
 
 class CompilerEnv:
-    def __init__(self, ll_file, max_steps=20, state_type='MLP'):
+    def __init__(self, ll_file, max_steps=20, state_type='MLP', reward_type="InstCount"):
         self.ll_file = ll_file
-        self.baseline_perf = get_instrcount(ll_file, "-Oz")
+        self.reward_type = reward_type
+        self.baseline_perf = 0
+
+        if self.reward_type == "InstCount":
+            self.baseline_perf = get_instrcount(ll_file, "-Oz")
+        elif self.reward_type == "CodeSize":
+            self.baseline_perf = get_codesize(ll_file, "-Oz")
+        elif self.reward_type == "RunTime":
+            self.baseline_perf = get_runtime_internal(ll_file, "-O3")
+
         self.epsilon = 0
         self.state_type = state_type
         self.max_steps = max_steps
@@ -86,7 +95,14 @@ class CompilerEnv:
         self.update_graph_state(action)
 
         optimization_flags = "--enable-new-pm=0 " + " ".join([act.value for act in self.applied_passes])
-        current_perf = get_instrcount(self.ll_file, optimization_flags)
+
+        if self.reward_type == "InstCount":
+            current_perf = get_instrcount(self.ll_file, optimization_flags)
+        elif self.reward_type == "CodeSize":
+            current_perf = get_codesize(self.ll_file, optimization_flags)
+        elif self.reward_type == "RunTime":
+            current_perf = get_runtime_internal(self.ll_file, optimization_flags)
+
         # self.reward = (self.baseline_perf / (current_perf + self.epsilon)) - 1
         self.reward = (self.current_perf - current_perf) / self.baseline_perf
         self.current_perf = current_perf
