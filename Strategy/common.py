@@ -252,8 +252,8 @@ def get_codesize(ll_file, *opt_flags):
             return int(size, 16)  # Convert hexadecimal to integer
     return 0
 
-def get_pass_feature_internal(ll_file, *opt_flags, Arch="x86"):
-    # Convert the opt_flags into a list if it's a string
+def pass2vec(ll_file, *opt_flags, Arch="x86"):
+     # Convert the opt_flags into a list if it's a string
     opt_flags_list = opt_flags
     if len(opt_flags) == 1 and isinstance(opt_flags[0], str):
         opt_flags_list = opt_flags[0].split()
@@ -328,10 +328,14 @@ def get_pass_feature_internal(ll_file, *opt_flags, Arch="x86"):
     # Return results
     return instruction_counters
 
-def feature_change_due_to_pass(ll_file, *opt_flags):
+def get_pass_feature_internal(ll_file, *opt_flags, obs_type="pass2vec"):
+   if obs_type == "pass2vec":
+       return pass2vec(ll_file, *opt_flags, Arch="x86")
+
+def feature_change_due_to_pass(ll_file, *opt_flags, obs_type="pass2vec"):
     
-    baseline_counts = get_pass_feature_internal(ll_file, "-O0")  # Get the counts for no optimizations
-    pass_counts = get_pass_feature_internal(ll_file, *opt_flags)  # Get the counts for the given optimization flags
+    baseline_counts = get_pass_feature_internal(ll_file, "-O0", obs_type="pass2vec")  # Get the counts for no optimizations
+    pass_counts = get_pass_feature_internal(ll_file, *opt_flags, obs_type="pass2vec")  # Get the counts for the given optimization flags
     
     # Compute and return the differences
     diffs = {}

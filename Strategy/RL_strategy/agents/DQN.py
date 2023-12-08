@@ -6,7 +6,7 @@ from ..utility.torchUtils import one_hot, CustomDataset, GNN_collate_fn, Transfo
 class DQNAgent():
 
     def __init__(self,q_func,optimizer,replay_buffer,batch_size,replay_start_size,
-                 n_act,update_target_steps,explorer,gamma=0.9,state_type="MLP"):
+                 n_act,update_target_steps,explorer,gamma=0.9,obs_model="MLP"):
         
         self.explorer = explorer
 
@@ -16,7 +16,7 @@ class DQNAgent():
 
         self.global_step = 0
         self.rb = replay_buffer
-        self.state_type = state_type
+        self.obs_model = obs_model
         self.batch_size = batch_size
         self.replay_start_size = replay_start_size
         self.optimizer = optimizer
@@ -33,7 +33,7 @@ class DQNAgent():
         return self.explorer.act(self.predict,obs)
     
     def learn_batch(self, batch_obs, batch_action, batch_reward, batch_next_obs, batch_done):
-        if self.state_type == "MLP":
+        if self.obs_model == "MLP":
             
             pred_VS = self.pred_func(batch_obs)
             action_onehot = one_hot(batch_action, self.n_act)
@@ -46,7 +46,7 @@ class DQNAgent():
             loss.backward()
             self.optimizer.step()
 
-        elif self.state_type == "GCN":
+        elif self.obs_model == "GCN":
             
             dataset = CustomDataset(batch_obs, batch_action, batch_reward, batch_next_obs, batch_done)
             data_loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False, collate_fn=GNN_collate_fn)
@@ -67,7 +67,7 @@ class DQNAgent():
                 loss.backward()
                 self.optimizer.step()
         
-        elif self.state_type == "Transformer":
+        elif self.obs_model == "Transformer":
 
             dataset = CustomDataset(batch_obs, batch_action, batch_reward, batch_next_obs, batch_done)
             data_loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False, collate_fn=Transformer_collate_fn)
@@ -84,7 +84,7 @@ class DQNAgent():
                 loss.backward()
                 self.optimizer.step()
 
-        elif self.state_type == "GRNN" or self.state_type == "T-GCN":
+        elif self.obs_model == "GRNN" or self.obs_model == "T-GCN":
             dataset = CustomDataset(batch_obs, batch_action, batch_reward, batch_next_obs, batch_done)
             data_loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False, collate_fn=TGCN_collate_fn)
 
@@ -103,7 +103,7 @@ class DQNAgent():
     def learn(self, obs, action, reward, next_obs, done):
         self.global_step+=1
 
-        # if self.state_type == "GRNN":
+        # if self.obs_model == "GRNN":
         #     pred_VS = self.pred_func(obs)[0][action]
         #     target_Q = reward + (1 - done) * self.gamma * self.target_func(next_obs).max()
 

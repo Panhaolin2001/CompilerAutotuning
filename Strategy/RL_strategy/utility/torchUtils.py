@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import Dataset
 from torch_geometric.data import Batch
-from ...common import feature_change_due_to_pass
+from ...common import feature_change_due_to_pass, Actions
 
 def one_hot(index_list, class_num):
 
@@ -14,26 +14,27 @@ def one_hot(index_list, class_num):
     out = out.scatter_(dim=1,index=indexes,value=1)
     return out
 
-def MinMaxScaling(Actions, ll_file):
-    pass_features = {}
+def GetFeature(ll_file, obs_type="pass2vec"):
+    if obs_type == "pass2vec":
+        pass_features = {}
 
-    # 获取原始特征
-    for action in Actions:
-        pass_features[action.name] = feature_change_due_to_pass(ll_file, "--enable-new-pm=0 " + action.value)
+        # 获取原始特征
+        for action in Actions:
+            pass_features[action.name] = feature_change_due_to_pass(ll_file, "--enable-new-pm=0 " + action.value, obs_type="pass2vec")
 
-    # 保存原始的字典键和顺序
-    original_keys = list(pass_features.keys())
-    original_sub_keys = list(pass_features[original_keys[0]].keys())
+        # 保存原始的字典键和顺序
+        original_keys = list(pass_features.keys())
+        original_sub_keys = list(pass_features[original_keys[0]].keys())
 
-    # 准备缩放
-    pass_features_values = np.array([list(d.values()) for d in pass_features.values()])
-    scaler = MinMaxScaler(feature_range=(-1, 1))
-    scaled_features = scaler.fit_transform(pass_features_values)
+        # 准备缩放
+        pass_features_values = np.array([list(d.values()) for d in pass_features.values()])
+        scaler = MinMaxScaler(feature_range=(-1, 1))
+        scaled_features = scaler.fit_transform(pass_features_values)
 
-    # 将缩放后的特征赋值回字典
-    scaled_pass_features = {name: dict(zip(original_sub_keys, features)) for name, features in zip(original_keys, scaled_features)}
+        # 将缩放后的特征赋值回字典
+        scaled_pass_features = {name: dict(zip(original_sub_keys, features)) for name, features in zip(original_keys, scaled_features)}
 
-    return scaled_pass_features
+        return scaled_pass_features
 
 class CustomDataset(Dataset):
     def __init__(self, obs_list, actions, rewards, next_obs_list, done_list):

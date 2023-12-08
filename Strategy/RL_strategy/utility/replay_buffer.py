@@ -4,10 +4,10 @@ from torch import FloatTensor
 
 class ReplayBuffer():
 
-    def __init__(self, max_size, num_steps=4, state_type="MLP"):
+    def __init__(self, max_size, num_steps=4, obs_model="MLP"):
         self.buffer = collections.deque(maxlen = max_size)
         self.num_steps = num_steps
-        self.state_type = state_type
+        self.obs_model = obs_model
 
     def append(self, exp):
         self.buffer.append(exp)
@@ -16,10 +16,10 @@ class ReplayBuffer():
         mini_batch = random.sample(self.buffer, batch_size)
         obs_batch, action_batch, reward_batch, next_obs_batch, done_batch = zip(*mini_batch)
 
-        if self.state_type == "GCN" or self.state_type == "Transformer" or self.state_type == "T-GCN" or self.state_type == "GRNN":
+        if self.obs_model == "GCN" or self.obs_model == "Transformer" or self.obs_model == "T-GCN" or self.obs_model == "GRNN":
             obs_batch = obs_batch
             next_obs_batch = next_obs_batch
-        elif self.state_type == "MLP":
+        elif self.obs_model == "MLP":
             obs_batch = FloatTensor(obs_batch)
             next_obs_batch = FloatTensor(next_obs_batch)
 

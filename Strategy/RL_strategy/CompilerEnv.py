@@ -1,13 +1,14 @@
 from ..common import get_instrcount, Actions, get_codesize, get_runtime_internal
-from .utility.torchUtils import MinMaxScaling
+from .utility.torchUtils import GetFeature
 from torch_geometric.data import Data
 import torch
 import copy
 
 class CompilerEnv:
-    def __init__(self, ll_file, max_steps=20, state_type='MLP', reward_type="InstCount"):
+    def __init__(self, ll_file, max_steps=20, obs_model='MLP', reward_type="InstCount", obs_type="pass2vec"):
         self.ll_file = ll_file
         self.reward_type = reward_type
+        self.obs_type = obs_type
         self.baseline_perf = 0
 
         if self.reward_type == "InstCount":
@@ -18,9 +19,9 @@ class CompilerEnv:
             self.baseline_perf = get_runtime_internal(ll_file, "-O3")
 
         self.epsilon = 0
-        self.state_type = state_type
+        self.obs_model = obs_model
         self.max_steps = max_steps
-        self.pass_features = MinMaxScaling(Actions, ll_file)
+        self.pass_features = GetFeature(ll_file, obs_type=self.obs_type)
         self.feature_dim = len(self.pass_features[next(iter(self.pass_features))]) + 1
         self.n_act = len(Actions)
         self.state = None
@@ -43,17 +44,17 @@ class CompilerEnv:
         new_value = torch.tensor([(self.steps) / self.max_steps], dtype=torch.float)
         features_vector = torch.cat((features_vector, new_value))
 
-        if self.state_type == "GCN":
+        if self.obs_model == "GCN":
             self.state.x[self.steps] = features_vector
             if self.steps >= 2:
                 new_edge = torch.tensor([[self.steps - 1], [self.steps]], dtype=torch.long)
                 self.state.edge_index = torch.cat([self.state.edge_index, new_edge], dim=1)
 
-        elif self.state_type == "MLP":
+        elif self.obs_model == "MLP":
             self.state += features_vector
             self.state /= torch.tensor([self.steps], dtype=torch.float)
 
-        elif self.state_type == "GRNN":
+        elif self.obs_model == "GRNN":
             data = copy.deepcopy(self.state[-1])
             data.x[self.steps] = features_vector
             if self.steps >= 1:
@@ -68,10 +69,10 @@ class CompilerEnv:
             #     data.edge_index = torch.cat([data.edge_index, new_edge], dim=1)
             # self.datalist.append(data)
         
-        elif self.state_type == "Transformer":
+        elif self.obs_model == "Transformer":
             self.state[self.steps] = features_vector
 
-        elif self.state_type == "T-GCN":
+        elif self.obs_model == "T-GCN":
             # self.state.x[self.steps] = features_vector
             # if self.steps >= 2:
             #     new_edge = torch.tensor([[self.steps - 1], [self.steps]], dtype=torch.long)
@@ -128,25 +129,25 @@ class CompilerEnv:
         '''
         初始化状态
         '''
-        if self.state_type == "GCN":
+        if self.obs_model == "GCN":
             x = torch.zeros((self.max_steps, self.feature_dim), dtype=torch.float)
             edge_index = torch.empty((2, 0), dtype=torch.long)
             return Data(x=x, edge_index=edge_index)
         
-        elif self.state_type == "MLP":
+        elif self.obs_model == "MLP":
             return torch.zeros((self.feature_dim), dtype=torch.float)
         
-        elif self.state_type == "GRNN":
+        elif self.obs_model == "GRNN":
             x = torch.zeros((self.max_steps, self.feature_dim), dtype=torch.float)
             edge_index = torch.empty((2, 0), dtype=torch.long)
             data = Data(x=x, edge_index=edge_index)
             self.datalist.append(data)
             return self.datalist
 
-        elif self.state_type == "Transformer":
+        elif self.obs_model == "Transformer":
             return torch.zeros((self.max_steps, self.feature_dim), dtype=torch.float)
         
-        elif self.state_type == "T-GCN":
+        elif self.obs_model == "T-GCN":
             # x = torch.zeros((self.max_steps, self.feature_dim), dtype=torch.float)
             # edge_index = torch.empty((2, 0), dtype=torch.long)
             # return Data(x=x, edge_index=edge_index)

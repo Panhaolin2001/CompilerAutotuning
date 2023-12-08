@@ -19,33 +19,33 @@ class TrainManager():
         self.env = env
         self.episodes = episodes
         n_obs = env.feature_dim
-        rb = ReplayBuffer(memory_size, num_steps, self.env.state_type)
+        rb = ReplayBuffer(memory_size, num_steps, self.env.obs_model)
 
-        if self.env.state_type == "GCN":
+        if self.env.obs_model == "GCN":
             print("------------------------------")
             print("             GCN              ")
             print("------------------------------")
             q_func = GCN(n_obs, env.n_act)
 
-        elif self.env.state_type == "MLP":
+        elif self.env.obs_model == "MLP":
             print("------------------------------")
             print("             MLP              ")
             print("------------------------------")
             q_func = MLP(n_obs, env.n_act)
             
-        elif self.env.state_type == "Transformer":
+        elif self.env.obs_model == "Transformer":
             print("------------------------------")
             print("         Transformer          ")
             print("------------------------------")
             q_func = Transformer(n_obs, env.n_act)
         
-        elif self.env.state_type == "T-GCN":
+        elif self.env.obs_model == "T-GCN":
             print("------------------------------")
             print("            T-GCN             ")
             print("------------------------------")
             q_func = TGCN(n_obs, env.n_act)
 
-        elif self.env.state_type == "GRNN":
+        elif self.env.obs_model == "GRNN":
             print("------------------------------")
             print("             GRNN             ")
             print("------------------------------")
@@ -64,7 +64,7 @@ class TrainManager():
             update_target_steps=update_target_steps,
             explorer=explorer,
             gamma=gamma,
-            state_type=self.env.state_type
+            obs_model=self.env.obs_model
         )
     
     def train(self):
@@ -88,13 +88,13 @@ class TrainManager():
             # print(f"Action : {action}")
             reward,next_obs,done = self.env.step(action)
 
-            if self.env.state_type == "MLP":
+            if self.env.obs_model == "MLP":
                 next_obs = tuple(element.item() for element in next_obs)
                 obs = tuple(element.item() for element in obs)
 
             self.agent.learn(obs,action_idx,reward,next_obs,done)
 
-            if self.env.state_type == "MLP":
+            if self.env.obs_model == "MLP":
                 next_obs = torch.FloatTensor(next_obs)
                 obs = torch.FloatTensor(obs)
 
