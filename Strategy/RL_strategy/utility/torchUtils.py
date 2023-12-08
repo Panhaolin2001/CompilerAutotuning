@@ -3,7 +3,10 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import Dataset
 from torch_geometric.data import Batch
-from ...common import feature_change_due_to_pass, Actions
+from ..envUtility.common import feature_change_due_to_pass
+from ..envUtility.llvm16.actions import Actions_LLVM_16
+from ..envUtility.llvm14.actions import Actions_LLVM_14
+from ..envUtility.llvm10.actions import Actions_LLVM_10
 
 def one_hot(index_list, class_num):
 
@@ -14,8 +17,20 @@ def one_hot(index_list, class_num):
     out = out.scatter_(dim=1,index=indexes,value=1)
     return out
 
-def GetFeature(ll_file, obs_type="pass2vec"):
+def GetFeature(ll_file, obs_type="pass2vec", action_space="llvm-16.x"):
+
     if obs_type == "pass2vec":
+        Actions = 0
+        match action_space:
+            case "llvm-16.x":
+                Actions = Actions_LLVM_16
+            case "llvm-14.x":
+                Actions = Actions_LLVM_14
+            case "llvm-10.x":
+                Actions = Actions_LLVM_10
+            case _:
+                raise ValueError(f"Unknown action space: {action_space}, please choose 'llvm-16.x','llvm-14.x','llvm-10.x' ")
+            
         pass_features = {}
 
         # 获取原始特征

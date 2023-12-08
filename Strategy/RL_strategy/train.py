@@ -7,49 +7,66 @@ from .model.MLP import MLP
 from .model.TGCN import TGCN
 from .model.Transformer import Transformer
 from .utility.replay_buffer import ReplayBuffer
-from ..common import Actions
-
+from .envUtility.llvm16.actions import Actions_LLVM_16
+from .envUtility.llvm14.actions import Actions_LLVM_14
+from .envUtility.llvm10.actions import Actions_LLVM_10
 
 class TrainManager():
 
     def __init__(self,env,episodes=1000,lr=0.001,gamma=0.9,
                  e_greed=0.1,e_greed_decay=1e-6,memory_size=2000,replay_start_size=400,batch_size=32,num_steps=4,
-                 update_target_steps=200):
+                 update_target_steps=200, action_space="llvm-16.x"):
 
         self.env = env
         self.episodes = episodes
+        self.Actions = 0
+        self.action_space = action_space
         n_obs = env.feature_dim
         rb = ReplayBuffer(memory_size, num_steps, self.env.obs_model)
 
-        if self.env.obs_model == "GCN":
-            print("------------------------------")
-            print("             GCN              ")
-            print("------------------------------")
-            q_func = GCN(n_obs, env.n_act)
+        match self.action_space:
+            case "llvm-16.x":
+                self.Actions = Actions_LLVM_16
+            case "llvm-14.x":
+                self.Actions = Actions_LLVM_14
+            case "llvm-10.x":
+                self.Actions = Actions_LLVM_10
+            case _:
+                raise ValueError(f"Unknown action space: {self.action_space}, please choose 'llvm-16.x','llvm-14.x','llvm-10.x' ")
 
-        elif self.env.obs_model == "MLP":
-            print("------------------------------")
-            print("             MLP              ")
-            print("------------------------------")
-            q_func = MLP(n_obs, env.n_act)
-            
-        elif self.env.obs_model == "Transformer":
-            print("------------------------------")
-            print("         Transformer          ")
-            print("------------------------------")
-            q_func = Transformer(n_obs, env.n_act)
-        
-        elif self.env.obs_model == "T-GCN":
-            print("------------------------------")
-            print("            T-GCN             ")
-            print("------------------------------")
-            q_func = TGCN(n_obs, env.n_act)
+        match self.env.obs_model:
+            case "GCN":
+                print("------------------------------")
+                print("             GCN              ")
+                print("------------------------------")
+                q_func = GCN(n_obs, env.n_act)
 
-        elif self.env.obs_model == "GRNN":
-            print("------------------------------")
-            print("             GRNN             ")
-            print("------------------------------")
-            q_func = GraphRNN(n_obs, env.n_act)
+            case "MLP":
+                print("------------------------------")
+                print("             MLP              ")
+                print("------------------------------")
+                q_func = MLP(n_obs, env.n_act)
+
+            case "Transformer":
+                print("------------------------------")
+                print("         Transformer          ")
+                print("------------------------------")
+                q_func = Transformer(n_obs, env.n_act)
+
+            case "T-GCN":
+                print("------------------------------")
+                print("            T-GCN             ")
+                print("------------------------------")
+                q_func = TGCN(n_obs, env.n_act)
+
+            case "GRNN":
+                print("------------------------------")
+                print("             GRNN             ")
+                print("------------------------------")
+                q_func = GraphRNN(n_obs, env.n_act)
+
+            case _:
+                raise ValueError(f"Unknown obs model: {self.env.obs_model}, please choose 'GCN', 'MLP', 'Transformer', 'T-GCN', 'GRNN' ")
         
         optimizer = torch.optim.AdamW(q_func.parameters(), lr=lr)
         
@@ -84,7 +101,7 @@ class TrainManager():
         obs = self.env.reset()
         while True:
             action_idx = self.agent.act(obs)
-            action = list(Actions)[action_idx]
+            action = list(self.Actions)[action_idx]
             # print(f"Action : {action}")
             reward,next_obs,done = self.env.step(action)
 
@@ -109,7 +126,7 @@ class TrainManager():
         obs = self.env.reset()
         while True:
             action_idx = self.agent.predict(obs)
-            action = list(Actions)[action_idx]
+            action = list(self.Actions)[action_idx]
             print(f"Action : {action}")
             reward,next_obs,done = self.env.step(action)
             obs = next_obs

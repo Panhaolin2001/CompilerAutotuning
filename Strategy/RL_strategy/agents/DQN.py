@@ -33,46 +33,29 @@ class DQNAgent():
         return self.explorer.act(self.predict,obs)
     
     def learn_batch(self, batch_obs, batch_action, batch_reward, batch_next_obs, batch_done):
-        if self.obs_model == "MLP":
-            
-            pred_VS = self.pred_func(batch_obs)
-            action_onehot = one_hot(batch_action, self.n_act)
-            predict_Q = (pred_VS * action_onehot).sum(dim=1)
-            target_Q = batch_reward + (1 - batch_done) * self.gamma * self.target_func(batch_next_obs).max(1)[0]
 
-            # 更新参数
-            self.optimizer.zero_grad()
-            loss = self.criterion(predict_Q, target_Q)
-            loss.backward()
-            self.optimizer.step()
+        match self.obs_model:
+            case "GCN":
+                dataset = CustomDataset(batch_obs, batch_action, batch_reward, batch_next_obs, batch_done)
+                data_loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False, collate_fn=GNN_collate_fn)
 
-        elif self.obs_model == "GCN":
-            
-            dataset = CustomDataset(batch_obs, batch_action, batch_reward, batch_next_obs, batch_done)
-            data_loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False, collate_fn=GNN_collate_fn)
+                for batch_obs, batch_actions, batch_rewards, batch_next_obs, batch_done in data_loader:
+                    pred_VS = self.pred_func(batch_obs)
+                    action_onehot = one_hot(batch_action, self.n_act)
+                    predict_Q = (pred_VS * action_onehot).sum(dim=1)
+                    print(batch_reward.shape)
+                    print(batch_done.shape)
+                    print(self.target_func(batch_next_obs))
+                    print(self.target_func(batch_next_obs).max(1)[0].shape)
+                    target_Q = batch_reward + (1 - batch_done) * self.gamma * self.target_func(batch_next_obs).max(1)[0]
 
-            for batch_obs, batch_actions, batch_rewards, batch_next_obs, batch_done in data_loader:
-                pred_VS = self.pred_func(batch_obs)
-                action_onehot = one_hot(batch_action, self.n_act)
-                predict_Q = (pred_VS * action_onehot).sum(dim=1)
-                print(batch_reward.shape)
-                print(batch_done.shape)
-                print(self.target_func(batch_next_obs))
-                print(self.target_func(batch_next_obs).max(1)[0].shape)
-                target_Q = batch_reward + (1 - batch_done) * self.gamma * self.target_func(batch_next_obs).max(1)[0]
+                    # 更新参数
+                    self.optimizer.zero_grad()
+                    loss = self.criterion(predict_Q, target_Q)
+                    loss.backward()
+                    self.optimizer.step()
 
-                # 更新参数
-                self.optimizer.zero_grad()
-                loss = self.criterion(predict_Q, target_Q)
-                loss.backward()
-                self.optimizer.step()
-        
-        elif self.obs_model == "Transformer":
-
-            dataset = CustomDataset(batch_obs, batch_action, batch_reward, batch_next_obs, batch_done)
-            data_loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False, collate_fn=Transformer_collate_fn)
-
-            for batch_obs, batch_actions, batch_rewards, batch_next_obs, batch_done in data_loader:
+            case "MLP":
                 pred_VS = self.pred_func(batch_obs)
                 action_onehot = one_hot(batch_action, self.n_act)
                 predict_Q = (pred_VS * action_onehot).sum(dim=1)
@@ -84,21 +67,40 @@ class DQNAgent():
                 loss.backward()
                 self.optimizer.step()
 
-        elif self.obs_model == "GRNN" or self.obs_model == "T-GCN":
-            dataset = CustomDataset(batch_obs, batch_action, batch_reward, batch_next_obs, batch_done)
-            data_loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False, collate_fn=TGCN_collate_fn)
+            case "Transformer":
+                dataset = CustomDataset(batch_obs, batch_action, batch_reward, batch_next_obs, batch_done)
+                data_loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False, collate_fn=Transformer_collate_fn)
 
-            for batch_obs, batch_actions, batch_rewards, batch_next_obs, batch_done in data_loader:
-                pred_VS = self.pred_func(batch_obs).squeeze(0)
-                action_onehot = one_hot(batch_action, self.n_act)
-                predict_Q = (pred_VS * action_onehot).sum(dim=1)
-                target_Q = batch_reward + (1 - batch_done) * self.gamma * self.target_func(batch_next_obs).max(2)[0].squeeze(0)
+                for batch_obs, batch_actions, batch_rewards, batch_next_obs, batch_done in data_loader:
+                    pred_VS = self.pred_func(batch_obs)
+                    action_onehot = one_hot(batch_action, self.n_act)
+                    predict_Q = (pred_VS * action_onehot).sum(dim=1)
+                    target_Q = batch_reward + (1 - batch_done) * self.gamma * self.target_func(batch_next_obs).max(1)[0]
 
-                # 更新参数
-                self.optimizer.zero_grad()
-                loss = self.criterion(predict_Q, target_Q)
-                loss.backward()
-                self.optimizer.step()
+                    # 更新参数
+                    self.optimizer.zero_grad()
+                    loss = self.criterion(predict_Q, target_Q)
+                    loss.backward()
+                    self.optimizer.step()
+
+            case "T-GCN" | "GRNN" :
+                dataset = CustomDataset(batch_obs, batch_action, batch_reward, batch_next_obs, batch_done)
+                data_loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False, collate_fn=TGCN_collate_fn)
+
+                for batch_obs, batch_actions, batch_rewards, batch_next_obs, batch_done in data_loader:
+                    pred_VS = self.pred_func(batch_obs).squeeze(0)
+                    action_onehot = one_hot(batch_action, self.n_act)
+                    predict_Q = (pred_VS * action_onehot).sum(dim=1)
+                    target_Q = batch_reward + (1 - batch_done) * self.gamma * self.target_func(batch_next_obs).max(2)[0].squeeze(0)
+
+                    # 更新参数
+                    self.optimizer.zero_grad()
+                    loss = self.criterion(predict_Q, target_Q)
+                    loss.backward()
+                    self.optimizer.step()
+
+            case _:
+                raise ValueError(f"Unknown obs model: {self.obs_model}, please choose 'GCN', 'MLP', 'Transformer', 'T-GCN', 'GRNN' ")
 
     def learn(self, obs, action, reward, next_obs, done):
         self.global_step+=1
