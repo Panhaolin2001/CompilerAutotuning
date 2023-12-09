@@ -1,4 +1,4 @@
-from ..common import get_instrcount, get_codesize, get_runtime_internal
+from ..common import get_instrcount, get_codesize, get_runtime_internal, compile_cpp_to_ll
 from .envUtility.llvm16.actions import Actions_LLVM_16
 from .envUtility.llvm14.actions import Actions_LLVM_14
 from .envUtility.llvm10.actions import Actions_LLVM_10
@@ -8,8 +8,8 @@ import torch
 import copy
 
 class CompilerEnv:
-    def __init__(self, ll_file, max_steps=20, obs_model='MLP', reward_type="InstCount", obs_type="pass2vec", action_space="llvm-16.x"):
-        self.ll_file = ll_file
+    def __init__(self, source_file, is_wafer=False,wafer_lower_pass_options=None,max_steps=20, obs_model='MLP', reward_type="InstCount", obs_type="pass2vec", action_space="llvm-16.x"):
+        self.ll_file = compile_cpp_to_ll(source_file, ll_file_dir=None, is_wafer=is_wafer,wafer_lower_pass_options=wafer_lower_pass_options)
         self.reward_type = reward_type
         self.obs_type = obs_type
         self.action_space = action_space
@@ -18,7 +18,7 @@ class CompilerEnv:
         self.epsilon = 0
         self.obs_model = obs_model
         self.max_steps = max_steps
-        self.pass_features = GetFeature(ll_file, obs_type=self.obs_type, action_space=self.action_space)
+        self.pass_features = GetFeature(self.ll_file, obs_type=self.obs_type, action_space=self.action_space)
         self.feature_dim = len(self.pass_features[next(iter(self.pass_features))]) + 1
         self.state = None
         self.list = []
@@ -37,11 +37,11 @@ class CompilerEnv:
 
         match self.reward_type:
             case "InstCount":
-                self.baseline_perf = get_instrcount(ll_file, "-Oz")
+                self.baseline_perf = get_instrcount(self.ll_file, "-Oz")
             case "CodeSize":
-                self.baseline_perf = get_codesize(ll_file, "-Oz")
+                self.baseline_perf = get_codesize(self.ll_file, "-Oz")
             case "RunTime":
-                self.baseline_perf = get_runtime_internal(ll_file, "-O3")
+                self.baseline_perf = get_runtime_internal(self.ll_file, "-O3")
             case _:
                 raise ValueError(f"Unknown reward type: {self.reward_type}, please choose 'InstCount','CodeSize','RunTime'")
 
