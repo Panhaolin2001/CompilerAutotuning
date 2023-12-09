@@ -102,7 +102,6 @@ class TrainManager():
         while True:
             action_idx = self.agent.act(obs)
             action = list(self.Actions)[action_idx]
-            # print(f"Action : {action}")
             reward,next_obs,done = self.env.step(action)
 
             if self.env.obs_model == "MLP":

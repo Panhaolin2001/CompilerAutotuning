@@ -3,7 +3,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 from typing import NamedTuple, Optional
-from ...common import get_codesize, get_instrcount, GenerateObjFile, create_executable
+from ...common import get_codesize, get_instrcount, GenerateASMFile, create_executable
 import subprocess
 import re
 
@@ -33,16 +33,10 @@ def pass2vec(ll_file, *opt_flags, Arch="x86"):
         opt_flags_list = opt_flags[0].split()
 
     # Assume GenerateObjFile and create_executable functions are already defined
-    object_file = GenerateObjFile(ll_file, opt_flags_list)
-    executable_file = object_file.replace(".o", "")
-    create_executable([object_file], executable_file)
-
-    # Use objdump to get the assembly code of the .text section
-    cmd = ['objdump', '-d', '-j', '.text', executable_file]
-    output = subprocess.check_output(cmd).decode('utf-8')
+    asm_file = GenerateASMFile(ll_file, opt_flags_list)
 
     # Extract assembly instructions using regex
-    asm_lines = re.findall(r'\t(.+)$', output, re.MULTILINE)
+    asm_lines = re.findall(r'\t(.+)$', asm_file, re.MULTILINE)
     
     if(Arch == "x86"):
         # Initialize instruction counters
@@ -83,17 +77,17 @@ def pass2vec(ll_file, *opt_flags, Arch="x86"):
                 if re.search(fr'\b{keyword}\b', line):
                     instruction_counters[keyword] += 1
 
-        # Special regex checks
-        if re.search(r'\bv\w*', line):
-            instruction_counters['vector'] += 1
-        if re.search(r'(vmov|vpbroadcast|vgather|vscatter)', line):
-            instruction_counters['vector_load_store'] += 1
-        if re.search(r'\b(jmp|je|jne|jg|jge|jl|jle|ja|jae|jb|jbe|jz|jnz)\b', line):
-            instruction_counters['jump'] += 1
-        if re.search(r'\b(call|callq)\b', line):
-            instruction_counters['call'] += 1
-        if re.search(r'\b(ret|retq)\b', line):
-            instruction_counters['ret'] += 1
+            # Special regex checks
+            if re.search(r'\bv\w*', line):
+                instruction_counters['vector'] += 1
+            if re.search(r'(vmov|vpbroadcast|vgather|vscatter)', line):
+                instruction_counters['vector_load_store'] += 1
+            if re.search(r'\b(jmp|je|jne|jg|jge|jl|jle|ja|jae|jb|jbe|jz|jnz)\b', line):
+                instruction_counters['jump'] += 1
+            if re.search(r'\b(call|callq)\b', line):
+                instruction_counters['call'] += 1
+            if re.search(r'\b(ret|retq)\b', line):
+                instruction_counters['ret'] += 1
         
         instruction_counters['Codesize'] = get_codesize(ll_file, *opt_flags)
         # instruction_counters['Performance'] = get_runtime(ll_file, *opt_flags)

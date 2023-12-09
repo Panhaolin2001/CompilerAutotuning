@@ -33,20 +33,16 @@ def GetFeature(ll_file, obs_type="pass2vec", action_space="llvm-16.x"):
             
         pass_features = {}
 
-        # 获取原始特征
         for action in Actions:
             pass_features[action.name] = feature_change_due_to_pass(ll_file, "--enable-new-pm=0 " + action.value, obs_type="pass2vec")
 
-        # 保存原始的字典键和顺序
         original_keys = list(pass_features.keys())
         original_sub_keys = list(pass_features[original_keys[0]].keys())
 
-        # 准备缩放
         pass_features_values = np.array([list(d.values()) for d in pass_features.values()])
         scaler = MinMaxScaler(feature_range=(-1, 1))
         scaled_features = scaler.fit_transform(pass_features_values)
 
-        # 将缩放后的特征赋值回字典
         scaled_pass_features = {name: dict(zip(original_sub_keys, features)) for name, features in zip(original_keys, scaled_features)}
 
         return scaled_pass_features
@@ -90,16 +86,12 @@ def Transformer_collate_fn(data_list):
     return batched_obs, actions, rewards, batched_next_obs, dones
 
 def TGCN_collate_fn(batch):
-    # 解压数据
     nested_obs_list, actions, rewards, nested_next_obs_list, done_list = zip(*batch)
 
-    # 扁平化每个嵌套列表中的 Data 对象
     batched_obs = nested_obs_list
     batched_next_obs = nested_next_obs_list
-    # 其他数据转换为张量
     actions = torch.tensor(actions, dtype=torch.float)
     rewards = torch.tensor(rewards, dtype=torch.float)
     done_list = torch.tensor(done_list, dtype=torch.float)
 
-    # 注意：返回的是 Batch 对象列表，而不是单个 Batch 对象
     return batched_obs, actions, rewards, batched_next_obs, done_list

@@ -8,9 +8,9 @@ class EpsilonGreedy():
         self.decay = decay_rate
     
     def act(self,predict_method,obs):
-        if np.random.uniform(0,1) < self.epsilon: #探索
+        if np.random.uniform(0,1) < self.epsilon:
             action = np.random.choice(self.n_act)
-        else: #利用
+        else:
             action = predict_method(obs)
         
         self.epsilon = max(0.01, self.epsilon - self.decay)

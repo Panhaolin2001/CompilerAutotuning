@@ -49,7 +49,6 @@ class DQNAgent():
                     print(self.target_func(batch_next_obs).max(1)[0].shape)
                     target_Q = batch_reward + (1 - batch_done) * self.gamma * self.target_func(batch_next_obs).max(1)[0]
 
-                    # 更新参数
                     self.optimizer.zero_grad()
                     loss = self.criterion(predict_Q, target_Q)
                     loss.backward()
@@ -61,7 +60,6 @@ class DQNAgent():
                 predict_Q = (pred_VS * action_onehot).sum(dim=1)
                 target_Q = batch_reward + (1 - batch_done) * self.gamma * self.target_func(batch_next_obs).max(1)[0]
 
-                # 更新参数
                 self.optimizer.zero_grad()
                 loss = self.criterion(predict_Q, target_Q)
                 loss.backward()
@@ -77,7 +75,6 @@ class DQNAgent():
                     predict_Q = (pred_VS * action_onehot).sum(dim=1)
                     target_Q = batch_reward + (1 - batch_done) * self.gamma * self.target_func(batch_next_obs).max(1)[0]
 
-                    # 更新参数
                     self.optimizer.zero_grad()
                     loss = self.criterion(predict_Q, target_Q)
                     loss.backward()
@@ -93,7 +90,6 @@ class DQNAgent():
                     predict_Q = (pred_VS * action_onehot).sum(dim=1)
                     target_Q = batch_reward + (1 - batch_done) * self.gamma * self.target_func(batch_next_obs).max(2)[0].squeeze(0)
 
-                    # 更新参数
                     self.optimizer.zero_grad()
                     loss = self.criterion(predict_Q, target_Q)
                     loss.backward()
@@ -104,20 +100,6 @@ class DQNAgent():
 
     def learn(self, obs, action, reward, next_obs, done):
         self.global_step+=1
-
-        # if self.obs_model == "GRNN":
-        #     pred_VS = self.pred_func(obs)[0][action]
-        #     target_Q = reward + (1 - done) * self.gamma * self.target_func(next_obs).max()
-
-        #     # 更新参数
-        #     self.optimizer.zero_grad()
-        #     loss = self.criterion(pred_VS, target_Q)
-        #     loss.backward()
-        #     self.optimizer.step()
-
-        # else:
-        #     self.global_step+=1
-
         self.rb.append((obs, action, reward, next_obs, done))
         
         if len(self.rb) > self.replay_start_size and self.global_step % self.rb.num_steps == 0:
