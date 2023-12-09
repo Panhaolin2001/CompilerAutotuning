@@ -34,8 +34,7 @@ def compile_cpp_to_ll(input_cpp, ll_file_dir=None, is_wafer=False,wafer_lower_pa
         subprocess.run(clang_cmd, check=True)
 
         wafer_cmd = [
-            os.path.join(wafer_tools_path, "wafer-frontend"), input_cpp, "-I", "/usr/lib/gcc/x86_64-linux-gnu/11/include",
-            "--JsonFilePath", "/wafer/phl/project/wafer-compiler/design.json", *wafer_lower_pass_options, "--wafer-to-llvmir", "-o", cpu_ll
+            os.path.join(wafer_tools_path, "wafer-frontend"), input_cpp, *wafer_lower_pass_options, "--wafer-to-llvmir", "-o", cpu_ll
         ]
         subprocess.run(wafer_cmd, check=True)
 
@@ -135,8 +134,15 @@ def get_codesize(ll_file, *opt_flags):
     asm_file = GenerateASMFile(ll_file, opt_flags_list)
     executable_file = asm_file.replace(".s", "")
     create_executable([asm_file], executable_file)
-    codesize = os.path.getsize(executable_file)
-    return codesize
+
+    cmd = ['objdump', '-h', executable_file]
+    output = subprocess.check_output(cmd).decode('utf-8')
+    
+    for line in output.splitlines():
+        if '.text' in line:
+            size = line.split()[2]
+            return int(size, 16)
+    return 0
 
 def get_instrcount(ll_file, *opt_flags):
     opt_flags_list = opt_flags
