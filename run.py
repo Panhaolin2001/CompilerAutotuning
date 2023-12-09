@@ -5,6 +5,14 @@ from Strategy.common import set_llvm_tools_path, set_wafer_tools_path
 # MLP/GCN/GRNN perform good
 # wafer only adapts llvm-16.x
 
+'''
+TODO: 
+    1. Benchmark Set : CBench; 
+    2. Other Obs Types: IR2Vec, AutoPhase;
+    3. Pass2Vec: 解决泛化性的问题
+    4. Preprocess Stage: 比如聚类等
+'''
+
 if __name__ == '__main__':
     set_llvm_tools_path(bin_file="/wafer/phl/project/wafer-compiler/3rdparty/llvm/build-16.x/bin/")
     set_wafer_tools_path(bin_file="/wafer/phl/project/wafer-compiler/build/bin")
