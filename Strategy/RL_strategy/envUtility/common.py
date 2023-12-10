@@ -83,13 +83,23 @@ def get_pass_feature_internal(ll_file, *opt_flags, obs_type="P2VInstCount"):
        env = compiler_gym.make(
        "llvm-v0",
        benchmark=benchmark,
-       observation_space="InstCountDict",
-       reward_space="IrInstructionCountOz"
+       observation_space="InstCountDict"
        )
        env.reset(benchmark=benchmark)
        return env.observation["InstCountDict"]
    
    elif obs_type == "P2VAutoPhase":
+       if len(opt_flags) == 1 and isinstance(opt_flags[0], str):
+            opt_flags = opt_flags[0].split()
+       benchmark = compiler_gym.envs.llvm.make_benchmark(GenerateBCFile(ll_file, opt_flags))
+       env = compiler_gym.make(
+       "llvm-v0",
+       benchmark=benchmark,
+       observation_space="AutophaseDict"
+       )
+       env.reset(benchmark=benchmark)
+       return env.observation["AutophaseDict"]
+   elif obs_type == "P2VIR2V":
        pass
 
 def feature_change_due_to_pass(ll_file, *opt_flags, baseline_counts, obs_type="P2VInstCount"):
