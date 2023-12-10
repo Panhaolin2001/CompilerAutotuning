@@ -50,6 +50,7 @@ def compile_cpp_to_ll(input_cpp, ll_file_dir=None, is_wafer=False,wafer_lower_pa
             os.path.join(llvm_tools_path, "clang++"), "-S", "-emit-llvm",
             input_cpp, "-std=c++2a", "-march=native", "-o", output_ll
         ]
+        subprocess.run(clang_cmd, check=True)
 
     return output_ll
 

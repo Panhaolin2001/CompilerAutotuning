@@ -43,10 +43,6 @@ class DQNAgent():
                     pred_VS = self.pred_func(batch_obs)
                     action_onehot = one_hot(batch_action, self.n_act)
                     predict_Q = (pred_VS * action_onehot).sum(dim=1)
-                    print(batch_reward.shape)
-                    print(batch_done.shape)
-                    print(self.target_func(batch_next_obs))
-                    print(self.target_func(batch_next_obs).max(1)[0].shape)
                     target_Q = batch_reward + (1 - batch_done) * self.gamma * self.target_func(batch_next_obs).max(1)[0]
 
                     self.optimizer.zero_grad()
