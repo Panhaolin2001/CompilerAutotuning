@@ -4,9 +4,9 @@ from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import Dataset
 from torch_geometric.data import Batch
 from ..envUtility.common import feature_change_due_to_pass
-from ..envUtility.llvm16.actions import Actions_LLVM_16
-from ..envUtility.llvm14.actions import Actions_LLVM_14
-from ..envUtility.llvm10.actions import Actions_LLVM_10
+from ..actionspace.llvm16.actions import Actions_LLVM_16
+from ..actionspace.llvm14.actions import Actions_LLVM_14
+from ..actionspace.llvm10.actions import Actions_LLVM_10
 
 def one_hot(index_list, class_num):
 

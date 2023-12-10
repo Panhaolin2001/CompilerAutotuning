@@ -1,7 +1,7 @@
 from ..common import get_instrcount, get_codesize, get_runtime_internal, compile_cpp_to_ll
-from .envUtility.llvm16.actions import Actions_LLVM_16
-from .envUtility.llvm14.actions import Actions_LLVM_14
-from .envUtility.llvm10.actions import Actions_LLVM_10
+from .actionspace.llvm16.actions import Actions_LLVM_16
+from .actionspace.llvm14.actions import Actions_LLVM_14
+from .actionspace.llvm10.actions import Actions_LLVM_10
 from .utility.torchUtils import GetFeature
 from torch_geometric.data import Data
 import torch

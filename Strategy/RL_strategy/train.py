@@ -7,9 +7,9 @@ from .model.MLP import MLP
 from .model.TGCN import TGCN
 from .model.Transformer import Transformer
 from .utility.replay_buffer import ReplayBuffer
-from .envUtility.llvm16.actions import Actions_LLVM_16
-from .envUtility.llvm14.actions import Actions_LLVM_14
-from .envUtility.llvm10.actions import Actions_LLVM_10
+from .actionspace.llvm16.actions import Actions_LLVM_16
+from .actionspace.llvm14.actions import Actions_LLVM_14
+from .actionspace.llvm10.actions import Actions_LLVM_10
 
 class TrainManager():
 
