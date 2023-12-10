@@ -1,5 +1,6 @@
-from ...common import get_codesize, get_instrcount, GenerateASMFile
+from ...common import get_codesize, get_instrcount, GenerateASMFile, GenerateBCFile
 import re
+import compiler_gym
 
 def pass2vec(ll_file, *opt_flags, Arch="x86"):
      # Convert the opt_flags into a list if it's a string
@@ -74,18 +75,26 @@ def pass2vec(ll_file, *opt_flags, Arch="x86"):
 def ir2vec(ll_file):
     pass
 
-def get_pass_feature_internal(ll_file, *opt_flags, obs_type="pass2vec"):
-   if obs_type == "pass2vec":
-       return pass2vec(ll_file, *opt_flags, Arch="x86")
-   elif obs_type == "ir2vec":
-       pass
-   elif obs_type == "pass2vec":
+def get_pass_feature_internal(ll_file, *opt_flags, obs_type="P2VInstCount"):
+   if obs_type == "P2VInstCount":
+       if len(opt_flags) == 1 and isinstance(opt_flags[0], str):
+            opt_flags = opt_flags[0].split()
+       benchmark = compiler_gym.envs.llvm.make_benchmark(GenerateBCFile(ll_file, opt_flags))
+       env = compiler_gym.make(
+       "llvm-v0",
+       benchmark=benchmark,
+       observation_space="InstCountDict",
+       reward_space="IrInstructionCountOz"
+       )
+       env.reset(benchmark=benchmark)
+       return env.observation["InstCountDict"]
+   
+   elif obs_type == "P2VAutoPhase":
        pass
 
-def feature_change_due_to_pass(ll_file, *opt_flags, obs_type="pass2vec"):
+def feature_change_due_to_pass(ll_file, *opt_flags, baseline_counts, obs_type="P2VInstCount"):
     
-    baseline_counts = get_pass_feature_internal(ll_file, "-O0", obs_type="pass2vec")  # Get the counts for no optimizations
-    pass_counts = get_pass_feature_internal(ll_file, *opt_flags, obs_type="pass2vec")  # Get the counts for the given optimization flags
+    pass_counts = get_pass_feature_internal(ll_file, *opt_flags, obs_type=obs_type)  # Get the counts for the given optimization flags
     
     # Compute and return the differences
     diffs = {}

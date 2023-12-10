@@ -3,10 +3,11 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import Dataset
 from torch_geometric.data import Batch
-from ..envUtility.common import feature_change_due_to_pass
+from ..envUtility.common import feature_change_due_to_pass, get_pass_feature_internal
 from ..actionspace.llvm16.actions import Actions_LLVM_16
 from ..actionspace.llvm14.actions import Actions_LLVM_14
 from ..actionspace.llvm10.actions import Actions_LLVM_10
+from ..actionspace.CompilerGymLLVMv0.actions import Actions_LLVM_10_0_0
 
 def one_hot(index_list, class_num):
 
@@ -17,9 +18,9 @@ def one_hot(index_list, class_num):
     out = out.scatter_(dim=1,index=indexes,value=1)
     return out
 
-def GetFeature(ll_file, obs_type="pass2vec", action_space="llvm-16.x"):
+def GetFeature(ll_file, obs_type="P2VInstCount", action_space="llvm-16.x"):
 
-    if obs_type == "pass2vec":
+    if obs_type == "P2VInstCount":
         Actions = 0
         match action_space:
             case "llvm-16.x":
@@ -28,22 +29,27 @@ def GetFeature(ll_file, obs_type="pass2vec", action_space="llvm-16.x"):
                 Actions = Actions_LLVM_14
             case "llvm-10.x":
                 Actions = Actions_LLVM_10
+            case "llvm-10.0.0":
+                Actions = Actions_LLVM_10_0_0
             case _:
-                raise ValueError(f"Unknown action space: {action_space}, please choose 'llvm-16.x','llvm-14.x','llvm-10.x' ")
+                raise ValueError(f"Unknown action space: {action_space}, please choose 'llvm-16.x','llvm-14.x','llvm-10.x','llvm-10.0.0' ")
             
         pass_features = {}
-
+        baseline_counts = get_pass_feature_internal(ll_file, "-O0", obs_type=obs_type)  # Get the counts for no optimizations
         for action in Actions:
-            pass_features[action.name] = feature_change_due_to_pass(ll_file, "--enable-new-pm=0 " + action.value, obs_type="pass2vec")
+            if action_space != "llvm-10.0.0" and action_space != "llvm-10.x":
+                pass_features[action.name] = feature_change_due_to_pass(ll_file, "--enable-new-pm=0 " + action.value, baseline_counts, obs_type=obs_type)
+            else:
+                pass_features[action.name] = feature_change_due_to_pass(ll_file, action.value, baseline_counts=baseline_counts, obs_type=obs_type)
 
         original_keys = list(pass_features.keys())
         original_sub_keys = list(pass_features[original_keys[0]].keys())
 
         pass_features_values = np.array([list(d.values()) for d in pass_features.values()])
-        scaler = MinMaxScaler(feature_range=(-1, 1))
-        scaled_features = scaler.fit_transform(pass_features_values)
+        # scaler = MinMaxScaler(feature_range=(-1, 1))
+        # scaled_features = scaler.fit_transform(pass_features_values)
 
-        scaled_pass_features = {name: dict(zip(original_sub_keys, features)) for name, features in zip(original_keys, scaled_features)}
+        scaled_pass_features = {name: dict(zip(original_sub_keys, features)) for name, features in zip(original_keys, pass_features_values)}
 
         return scaled_pass_features
 

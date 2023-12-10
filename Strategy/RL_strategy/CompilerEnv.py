@@ -2,13 +2,14 @@ from ..common import get_instrcount, get_codesize, get_runtime_internal, compile
 from .actionspace.llvm16.actions import Actions_LLVM_16
 from .actionspace.llvm14.actions import Actions_LLVM_14
 from .actionspace.llvm10.actions import Actions_LLVM_10
+from .actionspace.CompilerGymLLVMv0.actions import Actions_LLVM_10_0_0
 from .utility.torchUtils import GetFeature
 from torch_geometric.data import Data
 import torch
 import copy
 
 class CompilerEnv:
-    def __init__(self, source_file, is_wafer=False,wafer_lower_pass_options=None,max_steps=20, obs_model='MLP', reward_type="InstCount", obs_type="pass2vec", action_space="llvm-16.x"):
+    def __init__(self,source_file,is_wafer=False,wafer_lower_pass_options=None,max_steps=20,obs_model='MLP',reward_type="IRInstCount",obs_type="P2VInstCount",action_space="llvm-16.x"):
         self.ll_file = compile_cpp_to_ll(source_file, ll_file_dir=None, is_wafer=is_wafer,wafer_lower_pass_options=wafer_lower_pass_options)
         self.reward_type = reward_type
         self.obs_type = obs_type
@@ -17,6 +18,7 @@ class CompilerEnv:
         self.baseline_perf = 0
         self.epsilon = 0
         self.obs_model = obs_model
+        self.optimization_flags = None
         self.max_steps = max_steps
         self.pass_features = GetFeature(self.ll_file, obs_type=self.obs_type, action_space=self.action_space)
         self.feature_dim = len(self.pass_features[next(iter(self.pass_features))]) + 1
@@ -30,20 +32,22 @@ class CompilerEnv:
                 self.Actions = Actions_LLVM_14
             case "llvm-10.x":
                 self.Actions = Actions_LLVM_10
+            case "llvm-10.0.0":
+                self.Actions = Actions_LLVM_10_0_0
             case _:
-                raise ValueError(f"Unknown action space: {self.action_space}, please choose 'llvm-16.x','llvm-14.x','llvm-10.x' ")
+                raise ValueError(f"Unknown action space: {self.action_space}, please choose 'llvm-16.x','llvm-14.x','llvm-10.x','llvm-10.0.0' ")
 
         self.n_act = len(self.Actions)
 
         match self.reward_type:
-            case "InstCount":
+            case "IRInstCount":
                 self.baseline_perf = get_instrcount(self.ll_file, "-Oz")
             case "CodeSize":
                 self.baseline_perf = get_codesize(self.ll_file, "-Oz")
             case "RunTime":
                 self.baseline_perf = get_runtime_internal(self.ll_file, "-O3")
             case _:
-                raise ValueError(f"Unknown reward type: {self.reward_type}, please choose 'InstCount','CodeSize','RunTime'")
+                raise ValueError(f"Unknown reward type: {self.reward_type}, please choose 'IRInstCount','CodeSize','RunTime'")
 
     def update_graph_state(self, action):
         '''
@@ -97,17 +101,20 @@ class CompilerEnv:
         self.applied_passes_set.add(action)
         self.update_graph_state(action)
 
-        optimization_flags = "--enable-new-pm=0 " + " ".join([act.value for act in self.applied_passes])
+        if self.action_space != "llvm-10.0.0" and self.action_space != "llvm-10.x":
+            self.optimization_flags = "--enable-new-pm=0 " + " ".join([act.value for act in self.applied_passes])
+        else:
+            self.optimization_flags = " ".join([act.value for act in self.applied_passes])
 
         match self.reward_type:
-            case "InstCount":
-                current_perf = get_instrcount(self.ll_file, optimization_flags)
+            case "IRInstCount":
+                current_perf = get_instrcount(self.ll_file, self.optimization_flags)
             case "CodeSize":
-                current_perf = get_codesize(self.ll_file, optimization_flags)
+                current_perf = get_codesize(self.ll_file, self.optimization_flags)
             case "RunTime":
-                current_perf = get_runtime_internal(self.ll_file, optimization_flags)
+                current_perf = get_runtime_internal(self.ll_file, self.optimization_flags)
             case _:
-                raise ValueError(f"Unknown reward type: {self.reward_type}, please choose 'InstCount','CodeSize','RunTime'")
+                raise ValueError(f"Unknown reward type: {self.reward_type}, please choose 'IRInstCount','CodeSize','RunTime'")
 
         self.reward = (self.current_perf - current_perf) / self.baseline_perf
         self.current_perf = current_perf
@@ -153,5 +160,5 @@ class CompilerEnv:
                 return self.datalist
 
             case _:
-                raise ValueError(f"Unknown action space: {self.obs_model}, please choose 'llvm-16.x','llvm-14.x','llvm-10.x' ")
+                raise ValueError(f"Unknown action space: {self.obs_model}, please choose 'GCN', 'MLP', 'Transformer', 'T-GCN', 'GRNN' ")
             

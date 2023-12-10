@@ -10,17 +10,18 @@ from .utility.replay_buffer import ReplayBuffer
 from .actionspace.llvm16.actions import Actions_LLVM_16
 from .actionspace.llvm14.actions import Actions_LLVM_14
 from .actionspace.llvm10.actions import Actions_LLVM_10
+from .actionspace.CompilerGymLLVMv0.actions import Actions_LLVM_10_0_0
 
 class TrainManager():
 
     def __init__(self,env,episodes=1000,lr=0.001,gamma=0.9,
                  e_greed=0.1,e_greed_decay=1e-6,memory_size=2000,replay_start_size=400,batch_size=32,num_steps=4,
-                 update_target_steps=200, action_space="llvm-16.x"):
+                 update_target_steps=200):
 
         self.env = env
         self.episodes = episodes
         self.Actions = 0
-        self.action_space = action_space
+        self.action_space = self.env.action_space
         n_obs = env.feature_dim
         rb = ReplayBuffer(memory_size, num_steps, self.env.obs_model)
 
@@ -31,8 +32,10 @@ class TrainManager():
                 self.Actions = Actions_LLVM_14
             case "llvm-10.x":
                 self.Actions = Actions_LLVM_10
+            case "llvm-10.0.0":
+                self.Actions = Actions_LLVM_10_0_0
             case _:
-                raise ValueError(f"Unknown action space: {self.action_space}, please choose 'llvm-16.x','llvm-14.x','llvm-10.x' ")
+                raise ValueError(f"Unknown action space: {self.action_space}, please choose 'llvm-16.x','llvm-14.x','llvm-10.x','llvm-10.0.0' ")
 
         match self.env.obs_model:
             case "GCN":
