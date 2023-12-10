@@ -19,39 +19,37 @@ def one_hot(index_list, class_num):
     return out
 
 def GetFeature(ll_file, obs_type="P2VInstCount", action_space="llvm-16.x"):
+    Actions = 0
+    match action_space:
+        case "llvm-16.x":
+            Actions = Actions_LLVM_16
+        case "llvm-14.x":
+            Actions = Actions_LLVM_14
+        case "llvm-10.x":
+            Actions = Actions_LLVM_10
+        case "llvm-10.0.0":
+            Actions = Actions_LLVM_10_0_0
+        case _:
+            raise ValueError(f"Unknown action space: {action_space}, please choose 'llvm-16.x','llvm-14.x','llvm-10.x','llvm-10.0.0' ")
+        
+    pass_features = {}
+    baseline_counts = get_pass_feature_internal(ll_file, "-O0", obs_type=obs_type)  # Get the counts for no optimizations
+    for action in Actions:
+        if action_space != "llvm-10.0.0" and action_space != "llvm-10.x":
+            pass_features[action.name] = feature_change_due_to_pass(ll_file, "--enable-new-pm=0 " + action.value, baseline_counts, obs_type=obs_type)
+        else:
+            pass_features[action.name] = feature_change_due_to_pass(ll_file, action.value, baseline_counts=baseline_counts, obs_type=obs_type)
 
-    if obs_type == "P2VInstCount":
-        Actions = 0
-        match action_space:
-            case "llvm-16.x":
-                Actions = Actions_LLVM_16
-            case "llvm-14.x":
-                Actions = Actions_LLVM_14
-            case "llvm-10.x":
-                Actions = Actions_LLVM_10
-            case "llvm-10.0.0":
-                Actions = Actions_LLVM_10_0_0
-            case _:
-                raise ValueError(f"Unknown action space: {action_space}, please choose 'llvm-16.x','llvm-14.x','llvm-10.x','llvm-10.0.0' ")
-            
-        pass_features = {}
-        baseline_counts = get_pass_feature_internal(ll_file, "-O0", obs_type=obs_type)  # Get the counts for no optimizations
-        for action in Actions:
-            if action_space != "llvm-10.0.0" and action_space != "llvm-10.x":
-                pass_features[action.name] = feature_change_due_to_pass(ll_file, "--enable-new-pm=0 " + action.value, baseline_counts, obs_type=obs_type)
-            else:
-                pass_features[action.name] = feature_change_due_to_pass(ll_file, action.value, baseline_counts=baseline_counts, obs_type=obs_type)
+    original_keys = list(pass_features.keys())
+    original_sub_keys = list(pass_features[original_keys[0]].keys())
 
-        original_keys = list(pass_features.keys())
-        original_sub_keys = list(pass_features[original_keys[0]].keys())
+    pass_features_values = np.array([list(d.values()) for d in pass_features.values()])
+    # scaler = MinMaxScaler(feature_range=(-1, 1))
+    # scaled_features = scaler.fit_transform(pass_features_values)
 
-        pass_features_values = np.array([list(d.values()) for d in pass_features.values()])
-        # scaler = MinMaxScaler(feature_range=(-1, 1))
-        # scaled_features = scaler.fit_transform(pass_features_values)
+    scaled_pass_features = {name: dict(zip(original_sub_keys, features)) for name, features in zip(original_keys, pass_features_values)}
 
-        scaled_pass_features = {name: dict(zip(original_sub_keys, features)) for name, features in zip(original_keys, pass_features_values)}
-
-        return scaled_pass_features
+    return scaled_pass_features
 
 class CustomDataset(Dataset):
     def __init__(self, obs_list, actions, rewards, next_obs_list, done_list):
