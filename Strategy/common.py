@@ -15,6 +15,8 @@ def set_wafer_tools_path(bin_file):
     wafer_tools_path = bin_file
 
 def compile_cpp_to_ll(input_cpp, ll_file_dir=None, is_wafer=False,wafer_lower_pass_options=None):
+    if input_cpp.endswith(".ll"):
+        return input_cpp
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
     if ll_file_dir is None:
