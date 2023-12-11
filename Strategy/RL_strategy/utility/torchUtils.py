@@ -33,12 +33,12 @@ def GetFeature(ll_file, obs_type="P2VInstCount", action_space="llvm-16.x"):
             raise ValueError(f"Unknown action space: {action_space}, please choose 'llvm-16.x','llvm-14.x','llvm-10.x','llvm-10.0.0' ")
         
     pass_features = {}
-    baseline_counts = get_pass_feature_internal(ll_file, "-O0", obs_type=obs_type)  # Get the counts for no optimizations
+    baseline_counts = get_pass_feature_internal(ll_file, "-O0", obs_type=obs_type, llvm_version=action_space)  # Get the counts for no optimizations
     for action in Actions:
         if action_space != "llvm-10.0.0" and action_space != "llvm-10.x":
-            pass_features[action.name] = feature_change_due_to_pass(ll_file, "--enable-new-pm=0 " + action.value, baseline_counts, obs_type=obs_type)
+            pass_features[action.name] = feature_change_due_to_pass(ll_file, "--enable-new-pm=0 " + action.value, baseline_counts=baseline_counts, obs_type=obs_type, llvm_version=action_space)
         else:
-            pass_features[action.name] = feature_change_due_to_pass(ll_file, action.value, baseline_counts=baseline_counts, obs_type=obs_type)
+            pass_features[action.name] = feature_change_due_to_pass(ll_file, action.value, baseline_counts=baseline_counts, obs_type=obs_type, llvm_version=action_space)
 
     original_keys = list(pass_features.keys())
     original_sub_keys = list(pass_features[original_keys[0]].keys())
