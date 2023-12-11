@@ -11,6 +11,10 @@ TODO:
     2. Other Obs Types: IR2Vec, AutoPhase;
     3. Pass2Vec: 解决泛化性的问题
     4. Preprocess Stage: 比如聚类等
+    5. codesize,instcount,runtime的计算方式需要和compilergym一致才可比较
+    6. Pass2Vec: 目前只支持llvm10.0.0,因为内部使用的是compilergym的obs,
+                 需要支持其他的llvm版本(具体应该实现一下内部的compilergym的obs)
+    7. 移植ray的agent
 '''
 
 if __name__ == '__main__':
