@@ -1,5 +1,6 @@
 from ...common import get_codesize, get_instrcount, GenerateASMFile, GenerateBCFile
 from ..obsUtility.InstCount import get_inst_count_obs
+from ..obsUtility.Autophase import get_autophase_obs
 import re
 import compiler_gym
 
@@ -86,7 +87,7 @@ def get_pass_feature_internal(ll_file, *opt_flags, obs_type="P2VInstCount", llvm
        return get_inst_count_obs(bc_code, llvm_version)
    
    elif obs_type == "P2VAutoPhase":
-       pass
+       return get_autophase_obs(bc_code, llvm_version)
     
    elif obs_type == "P2VIR2V":
        pass

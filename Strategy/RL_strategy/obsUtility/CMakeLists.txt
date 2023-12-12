@@ -1,2 +1,2 @@
-add_subdirectory(Autophase)
 add_subdirectory(InstCount)
+add_subdirectory(Autophase)
