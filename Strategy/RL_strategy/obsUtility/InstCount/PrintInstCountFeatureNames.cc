@@ -21,7 +21,7 @@ struct Data {
 };
 
 extern "C" {
-void processData(const char* irFilePath, struct Data* result) {
+void GetInstCount(const char* irFilePath, struct Data* result) {
     llvm::SMDiagnostic error;
     llvm::LLVMContext ctx;
 
