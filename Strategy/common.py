@@ -9,6 +9,7 @@ wafer_tools_path = ""
 def set_llvm_tools_path(bin_file):
     global llvm_tools_path
     llvm_tools_path = bin_file
+    print(f"-- Using LLVM Toolchain : {llvm_tools_path}")
 
 def set_wafer_tools_path(bin_file):
     global wafer_tools_path

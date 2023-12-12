@@ -9,10 +9,11 @@ import torch
 import copy
 
 class CompilerEnv:
-    def __init__(self,source_file,is_wafer=False,wafer_lower_pass_options=None,max_steps=20,obs_model='MLP',reward_type="IRInstCount",obs_type="P2VInstCount",action_space="llvm-16.x"):
+    def __init__(self,source_file,is_wafer=False,wafer_lower_pass_options=None,max_steps=20,agent_type="DQN",obs_model='MLP',reward_type="IRInstCount",obs_type="P2VInstCount",action_space="llvm-16.x"):
         self.ll_file = compile_cpp_to_ll(source_file, ll_file_dir=None, is_wafer=is_wafer,wafer_lower_pass_options=wafer_lower_pass_options)
         self.reward_type = reward_type
         self.obs_type = obs_type
+        self.agent_type = agent_type
         self.action_space = action_space
         self.Actions = 0
         self.baseline_perf = 0
@@ -24,7 +25,18 @@ class CompilerEnv:
         self.feature_dim = len(self.pass_features[next(iter(self.pass_features))]) + 1
         self.state = None
         self.list = []
-        
+
+        print(f"-- Using Source File: {source_file}")
+        print(f"-- Using Wafer: {is_wafer}")
+        print(f"-- Using Wafer Lower Pass Options: {wafer_lower_pass_options}")
+        print(f"-- Max Steps: {max_steps}")
+        print(f"-- Using Agent: {agent_type}")
+        print(f"-- Using Model: {obs_model}")
+        print(f"-- Using Reward Type: {reward_type}")
+        print(f"-- Using Obs Type: {obs_type}")
+        print(f"-- Using Action Space: {action_space}")
+        print()
+
         match self.action_space:
             case "llvm-16.x":
                 self.Actions = Actions_LLVM_16

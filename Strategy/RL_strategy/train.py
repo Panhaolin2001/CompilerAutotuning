@@ -20,6 +20,7 @@ class TrainManager():
 
         self.env = env
         self.episodes = episodes
+        self.agent_type = self.env.agent_type
         self.Actions = 0
         self.action_space = self.env.action_space
         n_obs = env.feature_dim
@@ -39,33 +40,18 @@ class TrainManager():
 
         match self.env.obs_model:
             case "GCN":
-                print("------------------------------")
-                print("             GCN              ")
-                print("------------------------------")
                 q_func = GCN(n_obs, env.n_act)
 
             case "MLP":
-                print("------------------------------")
-                print("             MLP              ")
-                print("------------------------------")
                 q_func = MLP(n_obs, env.n_act)
 
             case "Transformer":
-                print("------------------------------")
-                print("         Transformer          ")
-                print("------------------------------")
                 q_func = Transformer(n_obs, env.n_act)
 
             case "T-GCN":
-                print("------------------------------")
-                print("            T-GCN             ")
-                print("------------------------------")
                 q_func = TGCN(n_obs, env.n_act)
 
             case "GRNN":
-                print("------------------------------")
-                print("             GRNN             ")
-                print("------------------------------")
                 q_func = GraphRNN(n_obs, env.n_act)
 
             case _:
@@ -74,20 +60,28 @@ class TrainManager():
         optimizer = torch.optim.AdamW(q_func.parameters(), lr=lr)
         
         explorer = EpsilonGreedy(env.n_act,e_greed,e_greed_decay)
-        self.agent = DQNAgent(
-            q_func=q_func,
-            optimizer=optimizer,
-            replay_buffer = rb,
-            batch_size=batch_size,
-            replay_start_size = replay_start_size,
-            n_act=env.n_act,
-            update_target_steps=update_target_steps,
-            explorer=explorer,
-            gamma=gamma,
-            obs_model=self.env.obs_model
-        )
+        
+        match self.agent_type:
+            case "DQN":
+                self.agent = DQNAgent(
+                    q_func=q_func,
+                    optimizer=optimizer,
+                    replay_buffer = rb,
+                    batch_size=batch_size,
+                    replay_start_size = replay_start_size,
+                    n_act=env.n_act,
+                    update_target_steps=update_target_steps,
+                    explorer=explorer,
+                    gamma=gamma,
+                    obs_model=self.env.obs_model
+                )
+            case _:
+                raise ValueError(f"Unknown agent type: {self.agent_type}, please choose 'DQN','PPO'")
     
     def train(self):
+        print()
+        print("Start Training...")
+        print()
         for e in range(self.episodes):
             ep_reward = self.train_episode()
             print("Episode %s: reward=%.3f"%(e,ep_reward))
@@ -98,6 +92,7 @@ class TrainManager():
         
         test_reward = self.test_episode()
         print("Test reward = %.3f" % (test_reward))
+        print("End Training")
 
     def train_episode(self):
         total_reward = 0
