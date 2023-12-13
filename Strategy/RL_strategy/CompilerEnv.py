@@ -3,7 +3,8 @@ from .actionspace.llvm16.actions import Actions_LLVM_16
 from .actionspace.llvm14.actions import Actions_LLVM_14
 from .actionspace.llvm10.actions import Actions_LLVM_10
 from .actionspace.CompilerGymLLVMv0.actions import Actions_LLVM_10_0_0
-from .utility.torchUtils import GetFeature
+from .obsUtility.InstCount import get_inst_count_obs
+from .utility.torchUtils import GetNodeFeature
 from torch_geometric.data import Data
 import torch
 import copy
@@ -21,7 +22,7 @@ class CompilerEnv:
         self.obs_model = obs_model
         self.optimization_flags = None
         self.max_steps = max_steps
-        self.pass_features = GetFeature(self.ll_file, obs_type=self.obs_type, action_space=self.action_space)
+        self.pass_features = GetNodeFeature(self.ll_file, obs_type=self.obs_type, action_space=self.action_space)
         self.feature_dim = len(self.pass_features[next(iter(self.pass_features))]) + 1
         self.state = None
         self.list = []
@@ -73,15 +74,15 @@ class CompilerEnv:
                 -> 更新节点向量特征(求均值)
         '''
         features = self.pass_features[action.name]
-        features_vector = torch.tensor([value for value in features.values() if isinstance(value, (int, float))], dtype=torch.float)
-        new_value = torch.tensor([(self.steps) / self.max_steps], dtype=torch.float)
+        features_vector = torch.tensor([value for value in features.values()], dtype=torch.float)
+        new_value = torch.tensor([self.steps], dtype=torch.float)
         features_vector = torch.cat((features_vector, new_value))
 
         match self.obs_model:
             case "GCN":
-                self.state.x[self.steps] = features_vector
-                if self.steps >= 2:
-                    new_edge = torch.tensor([[self.steps - 1], [self.steps]], dtype=torch.long)
+                self.state.x[self.steps + 1] = features_vector
+                if self.steps >= 1:
+                    new_edge = torch.tensor([[self.steps], [self.steps + 1]], dtype=torch.long)
                     self.state.edge_index = torch.cat([self.state.edge_index, new_edge], dim=1)
 
             case "MLP":
@@ -154,7 +155,11 @@ class CompilerEnv:
         '''
         match self.obs_model:
             case "GCN":
-                x = torch.zeros((self.max_steps, self.feature_dim), dtype=torch.float)
+                x = torch.zeros((self.max_steps + 1, self.feature_dim), dtype=torch.float) # add 1 means adding a program global feature vector.
+                features_vector = torch.tensor([value for value in get_inst_count_obs(self.ll_file, self.action_space).values()], dtype=torch.float)
+                new_value = torch.tensor([-1], dtype=torch.float)
+                features_vector = torch.cat((features_vector, new_value))
+                x[0] = features_vector
                 edge_index = torch.empty((2, 0), dtype=torch.long)
                 return Data(x=x, edge_index=edge_index)
             

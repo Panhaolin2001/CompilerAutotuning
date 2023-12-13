@@ -19,6 +19,10 @@ def get_inst_count_obs(ir_file_path, llvm_version="llvm-16.x"):
 
     # Convert the result to a Python dictionary
     result_dict = {item.name.decode(): item.value for item in result_array}
+    first_key = next(iter(result_dict))
+    first_value = result_dict[first_key]
 
+    # 除以第一个值并去掉第一个键值对
+    result_dict = {key: (value / 2) for key, value in result_dict.items() if key != first_key}
     # Print the Python dictionary
     return result_dict

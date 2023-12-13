@@ -78,11 +78,11 @@ def pass2vec(ll_file, *opt_flags, Arch="x86"):
 def ir2vec(ll_file):
     pass
 
-def get_pass_feature_internal(ll_file, *opt_flags, obs_type="P2VInstCount", llvm_version="llvm-16.x"):
+def get_pass_feature_internal(ll_file, *opt_flags, obs_type="P2VInstCount", llvm_version="llvm-16.x",llvm_tools_path=None):
     
    if len(opt_flags) == 1 and isinstance(opt_flags[0], str):
        opt_flags = opt_flags[0].split()
-   bc_code = GenerateBCFile(ll_file, opt_flags)
+   bc_code = GenerateBCFile(ll_file, opt_flags,llvm_tools_path)
 
    if obs_type == "P2VInstCount":
        return get_inst_count_obs(bc_code, llvm_version)
@@ -101,10 +101,13 @@ def get_pass_feature_internal(ll_file, *opt_flags, obs_type="P2VInstCount", llvm
             return get_ir2vec_sym_obs(bc_code)
        else:
             raise ValueError(f"Unknown {llvm_version}, please choose 'llvm-14.x','llvm-10.x','llvm-10.0.0' on P2VIR2VSym ")
+    
+   elif obs_type == "P2VCustom":
+       return pass2vec(ll_file, *opt_flags)
        
-def feature_change_due_to_pass(ll_file, *opt_flags, baseline_counts, obs_type="P2VInstCount", llvm_version="llvm-16.x"):
+def feature_change_due_to_pass(ll_file, *opt_flags, baseline_counts, obs_type="P2VInstCount", llvm_version="llvm-16.x", llvm_tools_path=None):
 
-    pass_counts = get_pass_feature_internal(ll_file,*opt_flags,obs_type=obs_type,llvm_version=llvm_version)  # Get the counts for the given optimization flags
+    pass_counts = get_pass_feature_internal(ll_file,*opt_flags,obs_type=obs_type,llvm_version=llvm_version,llvm_tools_path=llvm_tools_path)  # Get the counts for the given optimization flags
     
     # Compute and return the differences
     diffs = {}

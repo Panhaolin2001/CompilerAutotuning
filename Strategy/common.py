@@ -1,21 +1,9 @@
-import subprocess
 import re
 import os
 import time
+import subprocess
 
-llvm_tools_path = ""
-wafer_tools_path = ""
-
-def set_llvm_tools_path(bin_file):
-    global llvm_tools_path
-    llvm_tools_path = bin_file
-    print(f"-- Using LLVM Toolchain : {llvm_tools_path}")
-
-def set_wafer_tools_path(bin_file):
-    global wafer_tools_path
-    wafer_tools_path = bin_file
-
-def compile_cpp_to_ll(input_cpp, ll_file_dir=None, is_wafer=False,wafer_lower_pass_options=None):
+def compile_cpp_to_ll(input_cpp, ll_file_dir=None, is_wafer=False,wafer_lower_pass_options=None, llvm_tools_path=None, wafer_tools_path=None):
     if input_cpp.endswith(".ll") or input_cpp.endswith(".bc"):
         return input_cpp
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -57,7 +45,7 @@ def compile_cpp_to_ll(input_cpp, ll_file_dir=None, is_wafer=False,wafer_lower_pa
 
     return output_ll
 
-def GenerateBCFile(file_name, optimization_options):
+def GenerateBCFile(file_name, optimization_options, llvm_tools_path=None):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     log_dir = os.path.join(script_dir, "log")
 
@@ -74,7 +62,7 @@ def GenerateBCFile(file_name, optimization_options):
 
     return output_bc
 
-def GenerateASMFile(file_name, optimization_options):
+def GenerateASMFile(file_name, optimization_options, llvm_tools_path=None):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     log_dir = os.path.join(script_dir, "log")
     
@@ -96,7 +84,7 @@ def GenerateASMFile(file_name, optimization_options):
 
     return output_s
 
-def create_executable(object_files, output_file):
+def create_executable(object_files, output_file, llvm_tools_path=None):
     clang_path = os.path.join(llvm_tools_path, "clang++")
     command = [clang_path, "-fPIE"] + object_files + ["-o", output_file]
 
@@ -136,12 +124,12 @@ def run_bitcode_and_get_time(executable_file):
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"Error running {executable_file}") from e
 
-def get_codesize(ll_file, *opt_flags):
+def get_codesize(ll_file, *opt_flags, llvm_tools_path=None):
     opt_flags_list = opt_flags
     if len(opt_flags) == 1 and isinstance(opt_flags[0], str):
         opt_flags_list = opt_flags[0].split()
 
-    asm_file = GenerateASMFile(ll_file, opt_flags_list)
+    asm_file = GenerateASMFile(ll_file, opt_flags_list, llvm_tools_path)
     executable_file = asm_file.replace(".s", "")
     create_executable([asm_file], executable_file)
 
@@ -154,12 +142,12 @@ def get_codesize(ll_file, *opt_flags):
             return int(size, 16)
     return 0
 
-def get_instrcount(ll_file, *opt_flags):
+def get_instrcount(ll_file, *opt_flags, llvm_tools_path=None):
     opt_flags_list = opt_flags
     if len(opt_flags) == 1 and isinstance(opt_flags[0], str):
         opt_flags_list = opt_flags[0].split()
 
-    bc_file = GenerateBCFile(ll_file, opt_flags_list)
+    bc_file = GenerateBCFile(ll_file, opt_flags_list, llvm_tools_path)
     ll_file = bc_file.replace('.bc', '_isntr.ll')
     llvmdis_path = os.path.join(llvm_tools_path, "llvm-dis")
     subprocess.run([llvmdis_path, bc_file, '-o', ll_file], check=True)
@@ -173,12 +161,12 @@ def get_instrcount(ll_file, *opt_flags):
         if os.path.exists(ll_file):
             os.remove(ll_file)
 
-def get_runtime_internal(ll_file, *opt_flags):
+def get_runtime_internal(ll_file, *opt_flags, llvm_tools_path=None):
     opt_flags_list = opt_flags
     if len(opt_flags) == 1 and isinstance(opt_flags[0], str):
         opt_flags_list = opt_flags[0].split()
 
-    asm_file = GenerateASMFile(ll_file, opt_flags_list)
+    asm_file = GenerateASMFile(ll_file, opt_flags_list, llvm_tools_path)
     executable_file = asm_file.replace(".s", "")
     create_executable([asm_file], executable_file)
 
@@ -195,12 +183,12 @@ def get_runtime_internal(ll_file, *opt_flags):
         os.remove(asm_file)
         os.remove(executable_file)
 
-def get_runtime(ll_file, *opt_flags):
+def get_runtime(ll_file, *opt_flags, llvm_tools_path=None):
     opt_flags_list = opt_flags
     if len(opt_flags) == 1 and isinstance(opt_flags[0], str):
         opt_flags_list = opt_flags[0].split()
 
-    asm_file = GenerateASMFile(ll_file, opt_flags_list)
+    asm_file = GenerateASMFile(ll_file, opt_flags_list, llvm_tools_path)
     executable_file = asm_file.replace(".o", "")
     create_executable([asm_file], executable_file)
 
