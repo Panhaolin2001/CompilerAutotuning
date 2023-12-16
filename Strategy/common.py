@@ -61,6 +61,9 @@ def GenerateBCFile(file_name, optimization_options):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     log_dir = os.path.join(script_dir, "log")
 
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+
     opt_path = os.path.join(llvm_tools_path, "opt")
     output_bc = os.path.join(log_dir, "output.bc")
 
@@ -74,6 +77,9 @@ def GenerateBCFile(file_name, optimization_options):
 def GenerateASMFile(file_name, optimization_options):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     log_dir = os.path.join(script_dir, "log")
+    
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
 
     opt_path = os.path.join(llvm_tools_path, "opt")
     llc_path = os.path.join(llvm_tools_path, "llc")
