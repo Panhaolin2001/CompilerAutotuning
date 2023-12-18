@@ -104,8 +104,8 @@ class CompilerEnv(gym.Env):
     def _calculate_baseline_perf(self):
         reward_functions = {
             "IRInstCount": lambda: get_instrcount(self._ll_file, "-Oz", llvm_tools_path=self._llvm_tools_path),
-            "CodeSize": lambda: get_codesize(self._ll_file, "-Oz"),
-            "RunTime": lambda: get_runtime_internal(self._ll_file, "-O3")
+            "CodeSize": lambda: get_codesize(self._ll_file, "-Oz", llvm_tools_path=self._llvm_tools_path),
+            "RunTime": lambda: get_runtime_internal(self._ll_file, "-O3", llvm_tools_path=self._llvm_tools_path)
         }
 
         reward_function = reward_functions.get(self._config['reward_type'])

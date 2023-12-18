@@ -2,6 +2,19 @@ import re
 import os
 import time
 import subprocess
+import threading
+
+llvm_tools_path = ""
+wafer_tools_path = ""
+
+def set_llvm_tools_path(bin_file):
+    global llvm_tools_path
+    llvm_tools_path = bin_file
+    print(f"-- Using LLVM Toolchain : {llvm_tools_path}")
+
+def set_wafer_tools_path(bin_file):
+    global wafer_tools_path
+    wafer_tools_path = bin_file
 
 def compile_cpp_to_ll(input_cpp, ll_file_dir=None, is_wafer=False,wafer_lower_pass_options=None, llvm_tools_path=None, wafer_tools_path=None):
     if input_cpp.endswith(".ll") or input_cpp.endswith(".bc"):
@@ -12,10 +25,11 @@ def compile_cpp_to_ll(input_cpp, ll_file_dir=None, is_wafer=False,wafer_lower_pa
         ll_file_dir = os.path.join(script_dir, "ll_file")
 
     os.makedirs(ll_file_dir, exist_ok=True)
-    output_ll = os.path.join(ll_file_dir, "output.ll")
-    cpu_ll = os.path.join(ll_file_dir, "cpu.ll")
-    out_ll = os.path.join(ll_file_dir, "out.ll")
-    out1_ll = os.path.join(ll_file_dir, "out1.ll")
+    thread_id = threading.current_thread().ident
+    output_ll = os.path.join(ll_file_dir, f"output_{thread_id}.ll")
+    cpu_ll = os.path.join(ll_file_dir, f"cpu_{thread_id}.ll")
+    out_ll = os.path.join(ll_file_dir, f"out_{thread_id}.ll")
+    out1_ll = os.path.join(ll_file_dir, f"out1_{thread_id}.ll")
 
     if is_wafer:
         clang_cmd = [
@@ -53,7 +67,9 @@ def GenerateBCFile(file_name, optimization_options, llvm_tools_path=None):
         os.makedirs(log_dir)
 
     opt_path = os.path.join(llvm_tools_path, "opt")
-    output_bc = os.path.join(log_dir, "output.bc")
+
+    thread_id = threading.current_thread().ident
+    output_bc = os.path.join(log_dir, f"output_{thread_id}.bc")
 
     flat_opt_options = [str(item) for sublist in optimization_options for item in (sublist if isinstance(sublist, list) else [sublist])]
 
@@ -71,15 +87,16 @@ def GenerateASMFile(file_name, optimization_options, llvm_tools_path=None):
 
     opt_path = os.path.join(llvm_tools_path, "opt")
     llc_path = os.path.join(llvm_tools_path, "llc")
-    output_s = os.path.join(log_dir, "output.s")
-    output_ll = os.path.join(log_dir, "output.ll")
+
+    thread_id = threading.current_thread().ident
+    output_s = os.path.join(log_dir, f"output_{thread_id}.s")
+    output_ll = os.path.join(log_dir, f"output_{thread_id}.ll")
 
     flat_opt_options = [str(item) for sublist in optimization_options for item in (sublist if isinstance(sublist, list) else [sublist])]
 
     cmd_opt = [opt_path, "-S"] + flat_opt_options + [file_name, "-o", output_ll]
     subprocess.run(cmd_opt, check=True)
-
-    cmd_llc = [llc_path, "-relocation-model=pic","-mtriple=x86_64-unknown-linux-gnu", "-mattr=+sha", "-filetype=asm", "-o", output_s, output_ll]
+    cmd_llc = [llc_path, "-relocation-model=pic", "-mtriple=x86_64-unknown-linux-gnu", "-mattr=+sha", "-filetype=asm", "-o", output_s, output_ll]
     subprocess.run(cmd_llc, check=True)
 
     return output_s
@@ -131,15 +148,20 @@ def get_codesize(ll_file, *opt_flags, llvm_tools_path=None):
 
     asm_file = GenerateASMFile(ll_file, opt_flags_list, llvm_tools_path)
     executable_file = asm_file.replace(".s", "")
-    create_executable([asm_file], executable_file)
+    create_executable([asm_file], executable_file, llvm_tools_path=llvm_tools_path)
 
     cmd = ['objdump', '-h', executable_file]
     output = subprocess.check_output(cmd).decode('utf-8')
     
-    for line in output.splitlines():
-        if '.text' in line:
-            size = line.split()[2]
-            return int(size, 16)
+    try:
+        for line in output.splitlines():
+            if '.text' in line:
+                size = line.split()[2]
+                return int(size, 16)
+    finally:
+        if os.path.exists(asm_file) and os.path.exists(executable_file) :
+            os.remove(executable_file)
+            os.remove(asm_file)
     return 0
 
 def get_instrcount(ll_file, *opt_flags, llvm_tools_path=None):
@@ -158,8 +180,9 @@ def get_instrcount(ll_file, *opt_flags, llvm_tools_path=None):
             instr_count = content.count('=')
             return instr_count
     finally:
-        if os.path.exists(ll_file):
+        if os.path.exists(ll_file) and os.path.exists(bc_file):
             os.remove(ll_file)
+            os.remove(bc_file)
 
 def get_runtime_internal(ll_file, *opt_flags, llvm_tools_path=None):
     opt_flags_list = opt_flags
