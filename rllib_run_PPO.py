@@ -1,7 +1,7 @@
 import ray
 from ray.rllib.models import ModelCatalog
 from rllib_example.env import CompilerEnv
-from rllib_example.GCN_policy import GCN
+from rllib_example.GCN_PPO import GCN
 from ray.rllib.algorithms import ppo
 from ray.rllib.algorithms.dqn.dqn import DQNConfig
 from ray import tune
@@ -37,45 +37,6 @@ if __name__ == "__main__":
     env = CompilerEnv(env_config)
 
     ModelCatalog.register_custom_model("gcn_model", GCN)
-
-    
-    # replay_config = {
-    #         "capacity": 2000,
-    #         "prioritized_replay_alpha": 0.5,
-    #         "prioritized_replay_beta": 0.5,
-    #         "prioritized_replay_eps": 3e-6,
-    #     }
-
-    # explore_config = {
-    #         "type": "EpsilonGreedy",
-    #         "initial_epsilon": 1.5,
-    #         "final_epsilon": 0.01,
-    #     }
-
-    # algo = DQNConfig()\
-    #     .environment(env=env_name, disable_env_checking=True)\
-    #     .framework("torch")\
-    #     .training(
-    #         replay_buffer_config=replay_config,
-    #         model={
-    #             "custom_model": "gcn_model",
-    #             "custom_model_config": {},
-    #         },
-    #         _enable_learner_api=False,
-    #         lr=0.001,
-    #         gamma=0.9
-    #     )\
-    #     .rollouts(num_rollout_workers=1, num_envs_per_worker=1)\
-    #     .rl_module( _enable_rl_module_api=False)\
-    #     .exploration(exploration_config=explore_config)
-
-
-    # tune.Tuner(  
-    #         "DQN",
-    #         run_config=air.RunConfig(stop={"episode_reward_mean": 0.2}),
-    #         param_space=algo
-    #     ).fit()
-
 
     algo = ppo.PPOConfig()\
         .environment(env=env_name, disable_env_checking=True)\
