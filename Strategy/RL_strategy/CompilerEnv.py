@@ -10,19 +10,20 @@ import torch
 import copy
 
 class CompilerEnv:
-    def __init__(self,source_file,is_wafer=False,wafer_lower_pass_options=None,max_steps=20,agent_type="DQN",obs_model='MLP',reward_type="IRInstCount",obs_type="P2VInstCount",action_space="llvm-16.x"):
-        self.ll_file = compile_cpp_to_ll(source_file, ll_file_dir=None, is_wafer=is_wafer,wafer_lower_pass_options=wafer_lower_pass_options)
+    def __init__(self,source_file,is_wafer=False,wafer_lower_pass_options=None,max_steps=20,agent_type="DQN",obs_model='MLP',reward_type="IRInstCount",obs_type="P2VInstCount",action_space="llvm-16.x",llvm_tools_path=None):
+        self.ll_file = compile_cpp_to_ll(source_file, ll_file_dir=None, is_wafer=is_wafer,wafer_lower_pass_options=wafer_lower_pass_options,llvm_tools_path=llvm_tools_path)
         self.reward_type = reward_type
         self.obs_type = obs_type
         self.agent_type = agent_type
         self.action_space = action_space
+        self.llvm_tools_path=llvm_tools_path
         self.Actions = 0
         self.baseline_perf = 0
         self.epsilon = 0
         self.obs_model = obs_model
         self.optimization_flags = None
         self.max_steps = max_steps
-        self.pass_features = GetNodeFeature(self.ll_file, obs_type=self.obs_type, action_space=self.action_space)
+        self.pass_features = GetNodeFeature(self.ll_file, obs_type=self.obs_type, action_space=self.action_space, llvm_tools_path=self.llvm_tools_path)
         self.feature_dim = len(self.pass_features[next(iter(self.pass_features))]) + 1
         self.state = None
         self.list = []
@@ -54,11 +55,11 @@ class CompilerEnv:
 
         match self.reward_type:
             case "IRInstCount":
-                self.baseline_perf = get_instrcount(self.ll_file, "-Oz")
+                self.baseline_perf = get_instrcount(self.ll_file, "-Oz", llvm_tools_path=self.llvm_tools_path)
             case "CodeSize":
-                self.baseline_perf = get_codesize(self.ll_file, "-Oz")
+                self.baseline_perf = get_codesize(self.ll_file, "-Oz", llvm_tools_path=self.llvm_tools_path)
             case "RunTime":
-                self.baseline_perf = get_runtime_internal(self.ll_file, "-O3")
+                self.baseline_perf = get_runtime_internal(self.ll_file, "-O3", llvm_tools_path=self.llvm_tools_path)
             case _:
                 raise ValueError(f"Unknown reward type: {self.reward_type}, please choose 'IRInstCount','CodeSize','RunTime'")
 
@@ -121,11 +122,11 @@ class CompilerEnv:
 
         match self.reward_type:
             case "IRInstCount":
-                current_perf = get_instrcount(self.ll_file, self.optimization_flags)
+                current_perf = get_instrcount(self.ll_file, self.optimization_flags,llvm_tools_path=self.llvm_tools_path)
             case "CodeSize":
-                current_perf = get_codesize(self.ll_file, self.optimization_flags)
+                current_perf = get_codesize(self.ll_file, self.optimization_flags,llvm_tools_path=self.llvm_tools_path)
             case "RunTime":
-                current_perf = get_runtime_internal(self.ll_file, self.optimization_flags)
+                current_perf = get_runtime_internal(self.ll_file, self.optimization_flags,llvm_tools_path=self.llvm_tools_path)
             case _:
                 raise ValueError(f"Unknown reward type: {self.reward_type}, please choose 'IRInstCount','CodeSize','RunTime'")
 
