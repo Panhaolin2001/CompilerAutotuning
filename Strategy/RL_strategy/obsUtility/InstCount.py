@@ -17,12 +17,9 @@ def get_inst_count_obs(ir_file_path, llvm_version="llvm-16.x"):
     my_cpp_lib = ctypes.CDLL(library_path)
     my_cpp_lib.GetInstCount(ir_file_path.encode(), result_array)
 
-    # Convert the result to a Python dictionary
     result_dict = {item.name.decode(): item.value for item in result_array}
-    first_key = next(iter(result_dict))
-    first_value = result_dict[first_key]
+    max_key = max(result_dict, key=result_dict.get)
+    max_value = result_dict[max_key]
 
-    # 除以第一个值并去掉第一个键值对
-    result_dict = {key: (value / 2) for key, value in result_dict.items() if key != first_key}
-    # Print the Python dictionary
+    result_dict = {key: (value / max_value) for key, value in result_dict.items() if key != max_key}
     return result_dict

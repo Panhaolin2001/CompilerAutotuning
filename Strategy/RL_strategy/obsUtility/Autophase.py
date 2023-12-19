@@ -19,5 +19,8 @@ def get_autophase_obs(ir_file_path, llvm_version="llvm-16.x"):
 
     autophase_lib.GetAutophase(ir_file_path.encode(), result_array)
     result_dict = {item.name.decode(): item.value for item in result_array}
-    
+    max_key = max(result_dict, key=result_dict.get)
+    max_value = result_dict[max_key]
+
+    result_dict = {key: (value / max_value) for key, value in result_dict.items() if key != max_key}
     return result_dict
