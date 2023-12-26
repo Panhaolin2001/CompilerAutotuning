@@ -76,7 +76,7 @@ class CompilerEnv(gym.Env):
             "GCN": Dict({"nodes_features": Box(low=float('-inf'), high=float('inf'), shape=(self._max_steps + 1, self._feature_dim), dtype=np.float32),
                                        "edge_index": Box(low=0, high=self._max_steps, shape=(2,self._max_steps), dtype=np.int64)}),  # TODO: add edge feature.
 
-            "MLP": None,         # TODO: add MLP observation space.
+            "MLP": Box(low=float('-inf'), high=float('inf'), shape=(self._feature_dim,), dtype=np.float32),
             "Transformer": None, # TODO: add Transformer observation space.
             "T-GCN": None,       # TODO: add T-GCN observation space.
             "GRNN": None,        # TODO: add GRNN observation space.
@@ -161,8 +161,8 @@ class CompilerEnv(gym.Env):
             state["edge_index"][:, steps] = new_edge[:, 0]
 
     def _process_mlp(self, state, steps, features_vector):
-        state += features_vector
-        state /= torch.tensor([steps], dtype=torch.float)
+        state += features_vector # TODO: 
+        state /= (steps + 1)
 
     def _process_transformer(self, state, steps, features_vector):
         state[steps] = features_vector
@@ -229,7 +229,9 @@ class CompilerEnv(gym.Env):
         return {"nodes_features": x, "edge_index": edge_index}
     
     def _init_mlp_state(self, feature_dim):
-        return torch.zeros((feature_dim,), dtype=torch.float)
+        features_np = np.array([value for value in self._get_node_feature_type().values()], dtype=np.float32)
+        features_np = np.append(features_np, -1)
+        return features_np
 
     def _init_transformer_state(self, max_steps, feature_dim):
         return torch.zeros((max_steps, feature_dim), dtype=torch.float)
