@@ -7,7 +7,7 @@ from Strategy.RL_strategy.actionspace.llvm16.actions import Actions_LLVM_16
 from Strategy.RL_strategy.actionspace.llvm14.actions import Actions_LLVM_14
 from Strategy.RL_strategy.actionspace.llvm10.actions import Actions_LLVM_10
 from Strategy.RL_strategy.actionspace.CompilerGymLLVMv0.actions import Actions_LLVM_10_0_0
-from Strategy.common import get_instrcount, get_codesize, get_runtime_internal, compile_cpp_to_ll
+from Strategy.common import get_instrcount, get_codesize, get_runtime_internal, compile_cpp_to_ll, GenerateBCFile
 
 from gymnasium.spaces import Discrete, Box, Dict
 from torch_geometric.data import Data
@@ -15,6 +15,7 @@ import gymnasium as gym
 import numpy as np
 import copy
 import torch
+import shlex
 
 class CompilerEnv(gym.Env):
     def __init__(self, config):
@@ -34,20 +35,21 @@ class CompilerEnv(gym.Env):
         self._feature_dim = self._get_node_feature_dim()
         self.observation_space = self._get_observation_space()
         self._state = None
+        self._optimization_flags = ""
 
     def step(self, action_idx):
         self._steps += 1
         self._applied_passes.append(self._get_action_name(action_idx))
-        self._update_graph_state(action_idx)
+        self._update_state(action_idx)
 
         allowed_versions = ["llvm-10.0.0", "llvm-10.x"]
-        optimization_flags = (
+        self._optimization_flags = (
             "--enable-new-pm=0 " + " ".join([act.value for act in self._applied_passes])
             if self._config['action_space'] not in allowed_versions
             else " ".join([act.value for act in self._applied_passes])
         )
 
-        current_perf = self._calculate_current_perf(optimization_flags)
+        current_perf = self._calculate_current_perf(self._optimization_flags)
 
         self._reward = (self._current_perf - current_perf) / self._baseline_perf
         self._current_perf = current_perf
@@ -129,15 +131,20 @@ class CompilerEnv(gym.Env):
         current_perf = perf_function()
         return current_perf
 
-    def _update_graph_state(self, action_idx):
-        action = self._get_action_name(action_idx)
-        features = self._pass_features[action.name]
-        features_vector = torch.tensor([value for value in features.values()], dtype=torch.float)
-        new_value = torch.tensor([self._steps], dtype=torch.float)
-        features_vector = torch.cat((features_vector, new_value))
-        features_vector_np = features_vector.numpy()
+    def _update_state(self, action_idx):
 
-        self._process_obs_model(self._state, self._steps, features_vector_np, self._datalist)    
+        if self._config['isPass2Vec']:
+            action = self._get_action_name(action_idx)
+            features = self._pass_features[action.name]
+            features_vector = torch.tensor([value for value in features.values()], dtype=torch.float)
+            new_value = torch.tensor([self._steps], dtype=torch.float)
+            features_vector = torch.cat((features_vector, new_value))
+            features_vector_np = features_vector.numpy()
+
+            self._process_obs_model(self._state, self._steps, features_vector_np, self._datalist) 
+        else:
+            self._ll_file = GenerateBCFile(self._ll_file, shlex.split(self._optimization_flags), self._llvm_tools_path)
+            self.state = np.array([value for value in self._get_node_feature_type().values()], dtype=np.float32)
 
     def _process_obs_model(self, state, steps, features_vector, datalist):
         obs_model_functions = {
