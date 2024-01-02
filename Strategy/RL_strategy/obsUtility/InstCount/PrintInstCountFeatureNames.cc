@@ -21,11 +21,22 @@ struct Data {
 };
 
 extern "C" {
-void GetInstCount(const char* irFilePath, struct Data* result) {
+void GetInstCount(const char* irCode, struct Data* result) {
     llvm::SMDiagnostic error;
     llvm::LLVMContext ctx;
 
-    auto module = llvm::parseIRFile(irFilePath, error, ctx);
+    // Create a memory buffer from the IR code string
+    auto memBuffer = llvm::MemoryBuffer::getMemBuffer(llvm::StringRef(irCode), "", false);
+
+    // Parse LLVM IR from the memory buffer
+    auto module = llvm::parseIR(*memBuffer, error, ctx);
+
+    if (!module) {
+        // Handle parse error
+        std::cerr << "Error parsing LLVM IR code: " << error.getMessage().str() << std::endl;
+        return;
+    }
+
     const auto features = InstCount::getFeatureVector(*module);
     const auto featureNames = InstCount::getFeatureNames();
 
@@ -35,3 +46,4 @@ void GetInstCount(const char* irFilePath, struct Data* result) {
     }
 }
 }
+

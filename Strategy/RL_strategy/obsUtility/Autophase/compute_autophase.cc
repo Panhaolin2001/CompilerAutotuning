@@ -71,17 +71,28 @@ const std::vector<std::string> AUTOPHASE_FEATURE_NAMES = {
 };
 
 extern "C" {
-void GetAutophase(const char* irFilePath, struct AutophaseData* result) {
+void GetAutophase(const char* irCode, struct AutophaseData* result) {
     llvm::SMDiagnostic error;
     llvm::LLVMContext ctx;
 
-    auto module = llvm::parseIRFile(irFilePath, error, ctx);
+    // Create a memory buffer from the IR code string
+    auto memBuffer = llvm::MemoryBuffer::getMemBuffer(llvm::StringRef(irCode), "", false);
+
+    // Parse LLVM IR from the memory buffer
+    auto module = llvm::parseIR(*memBuffer, error, ctx);
+
+    if (!module) {
+        // Handle parse error
+        std::cerr << "Error parsing LLVM IR code: " << error.getMessage().str() << std::endl;
+        return;
+    }
+
     const auto features = autophase::InstCount::getFeatureVector(*module);
 
     if (features.size() > 0) {
       for(size_t i = 0; i < features.size(); ++i){
           strncpy(result[i].name, AUTOPHASE_FEATURE_NAMES[i].c_str(), sizeof(result[i].name));
-          result[i].name[sizeof(result[i].name) - 1] = '\0'; // 确保字符串以 null 终止
+          result[i].name[sizeof(result[i].name) - 1] = '\0';
           result[i].value = features[i];
       }
     }

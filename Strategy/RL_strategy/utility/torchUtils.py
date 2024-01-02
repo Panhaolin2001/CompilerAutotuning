@@ -18,7 +18,7 @@ def one_hot(index_list, class_num):
     out = out.scatter_(dim=1,index=indexes,value=1)
     return out
 
-def GetNodeFeature(ll_file, obs_type="P2VInstCount", action_space="llvm-16.x", llvm_tools_path=None):
+def GetNodeFeature(ll_code, obs_type="P2VInstCount", action_space="llvm-16.x", llvm_tools_path=None):
     Actions = 0
     match action_space:
         case "llvm-16.x":
@@ -33,19 +33,17 @@ def GetNodeFeature(ll_file, obs_type="P2VInstCount", action_space="llvm-16.x", l
             raise ValueError(f"Unknown action space: {action_space}, please choose 'llvm-16.x','llvm-14.x','llvm-10.x','llvm-10.0.0' ")
         
     pass_features = {}
-    baseline_counts = get_pass_feature_internal(ll_file, "-O0", obs_type=obs_type, llvm_version=action_space, llvm_tools_path=llvm_tools_path)  # Get the counts for no optimizations
+    baseline_counts = get_pass_feature_internal(ll_code, "-O0", obs_type=obs_type, llvm_version=action_space, llvm_tools_path=llvm_tools_path)  # Get the counts for no optimizations
     for action in Actions:
         if action_space != "llvm-10.0.0" and action_space != "llvm-10.x":
-            pass_features[action.name] = feature_change_due_to_pass(ll_file, "--enable-new-pm=0 " + action.value, baseline_counts=baseline_counts, obs_type=obs_type, llvm_version=action_space, llvm_tools_path=llvm_tools_path)
+            pass_features[action.name] = feature_change_due_to_pass(ll_code, "--enable-new-pm=0 " + action.value, baseline_counts=baseline_counts, obs_type=obs_type, llvm_version=action_space, llvm_tools_path=llvm_tools_path)
         else:
-            pass_features[action.name] = feature_change_due_to_pass(ll_file, action.value, baseline_counts=baseline_counts, obs_type=obs_type, llvm_version=action_space, llvm_tools_path=llvm_tools_path)
+            pass_features[action.name] = feature_change_due_to_pass(ll_code, action.value, baseline_counts=baseline_counts, obs_type=obs_type, llvm_version=action_space, llvm_tools_path=llvm_tools_path)
 
     original_keys = list(pass_features.keys())
     original_sub_keys = list(pass_features[original_keys[0]].keys())
 
     pass_features_values = np.array([list(d.values()) for d in pass_features.values()])
-    # scaler = MinMaxScaler(feature_range=(-1, 1))
-    # scaled_features = scaler.fit_transform(pass_features_values)
 
     scaled_pass_features = {name: dict(zip(original_sub_keys, features)) for name, features in zip(original_keys, pass_features_values)}
 
