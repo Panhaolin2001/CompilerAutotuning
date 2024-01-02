@@ -21,8 +21,7 @@ class CompilerEnv(gym.Env):
     def __init__(self, config):
         super(CompilerEnv, self).__init__()
         self._config = config
-        self._ll_code = compile_cpp_to_ll(self._config['source_file'], is_wafer=self._config['is_wafer'],wafer_lower_pass_options=self._config['wafer_lower_pass_options'], 
-                                          llvm_tools_path=self._config['llvm_tools_path'], wafer_tools_path=self._config['wafer_tools_path'] )
+        self._ll_code = compile_cpp_to_ll(self._config['source_file'], llvm_tools_path=self._config['llvm_tools_path'])
         self._llvm_tools_path = self._config['llvm_tools_path']
         self._reward_type = self._config['reward_type']
         self._obs_type = self._config['obs_type']

@@ -15,19 +15,14 @@ if __name__ == "__main__":
 
     env_name = 'CompilerGYM'
     env_config={
-            "source_file": "/wafer/phl/project/compiler_autotuning/ll_file/14.x/a.cpp",
-            "is_wafer": False,
-            "wafer_tools_path": "/wafer/phl/project/wafer-compiler/build/bin",
-            "wafer_lower_pass_options": ["-I", "/usr/lib/gcc/x86_64-linux-gnu/11/include",
-                                                "--JsonFilePath", "/wafer/phl/project/wafer-compiler/design.json",
-                                                "--lower-crypto-multi-x86", "--lower-cryptosha1-without-SHA1ISA"],
+            "source_file": "/wafer/phl/project/compiler_autotuning/ll_file/16.x/out.ll",
             "max_steps": 10,
             "obs_model": "MLP",
             "reward_type": "IRInstCount",
-            "obs_type": "P2VIR2VSym",
-            "action_space": "llvm-14.x",
-            "llvm_tools_path": "/wafer/phl/project/wafer-compiler/3rdparty/llvm/build-14.x/bin/",
-            "isPass2Vec": True,
+            "obs_type": "P2VInstCount",
+            "action_space": "llvm-16.x",
+            "llvm_tools_path": "/wafer/phl/project/wafer-compiler/3rdparty/llvm/build-16.x/bin/",
+            "isPass2Vec": False,
     }
 
     register_env('CompilerGYM', lambda config: env_creator(env_config))

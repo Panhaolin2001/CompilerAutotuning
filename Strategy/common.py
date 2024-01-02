@@ -17,7 +17,7 @@ def set_wafer_tools_path(bin_file):
     global wafer_tools_path
     wafer_tools_path = bin_file
 
-def compile_cpp_to_ll(input_cpp, is_wafer=False, wafer_lower_pass_options=None, llvm_tools_path=None, wafer_tools_path=None):
+def compile_cpp_to_ll(input_cpp, llvm_tools_path=None):
     if input_cpp.endswith(".ll") or input_cpp.endswith(".bc"):
         with open(input_cpp, 'r') as ll_file:
             return ll_file.read()
@@ -27,19 +27,8 @@ def compile_cpp_to_ll(input_cpp, is_wafer=False, wafer_lower_pass_options=None, 
         input_cpp, "-std=c++2a", "-march=native", "-o", "-"
     ]
 
-    if is_wafer:
-        wafer_cmd = [
-            os.path.join(wafer_tools_path, "wafer-frontend"), input_cpp, *wafer_lower_pass_options, "--wafer-to-llvmir", "-o", "-"
-        ]
-
-        clang_result = subprocess.run(clang_cmd, stdout=subprocess.PIPE, check=True)
-        wafer_result = subprocess.run(wafer_cmd, input=clang_result.stdout, stdout=subprocess.PIPE, check=True)
-
-        return wafer_result.stdout.decode()
-
-    else:
-        clang_result = subprocess.run(clang_cmd, stdout=subprocess.PIPE, check=True)
-        return clang_result.stdout.decode()
+    clang_result = subprocess.run(clang_cmd, stdout=subprocess.PIPE, check=True)
+    return clang_result.stdout.decode()
 
 def GenerateOptimizedLLCode(input_code, optimization_options, llvm_tools_path=None):
 
