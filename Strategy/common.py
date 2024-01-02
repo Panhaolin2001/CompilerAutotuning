@@ -41,12 +41,7 @@ def compile_cpp_to_ll(input_cpp, is_wafer=False, wafer_lower_pass_options=None, 
         clang_result = subprocess.run(clang_cmd, stdout=subprocess.PIPE, check=True)
         return clang_result.stdout.decode()
 
-def GenerateBCCode(input_code, optimization_options, llvm_tools_path=None):
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    log_dir = os.path.join(script_dir, "log")
-
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
+def GenerateOptimizedLLCode(input_code, optimization_options, llvm_tools_path=None):
 
     opt_path = os.path.join(llvm_tools_path, "opt")
 
@@ -56,8 +51,8 @@ def GenerateBCCode(input_code, optimization_options, llvm_tools_path=None):
     input_code_io.write(input_code)
     input_code_io.seek(0)  # Reset the file position to the beginning
 
-    cmd_opt = [opt_path] + flat_opt_options + ["-o", "-", "-"]
-    result = subprocess.run(cmd_opt, input=input_code_io.getvalue().encode(), stdout=subprocess.PIPE, check=True)
+    cmd_opt = [opt_path] + flat_opt_options + ["-S", "-"]
+    result = subprocess.run(cmd_opt, input=input_code_io.getvalue(), text=True, stdout=subprocess.PIPE, check=True)
 
     return result.stdout
 

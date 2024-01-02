@@ -7,7 +7,7 @@ from Strategy.RL_strategy.actionspace.llvm16.actions import Actions_LLVM_16
 from Strategy.RL_strategy.actionspace.llvm14.actions import Actions_LLVM_14
 from Strategy.RL_strategy.actionspace.llvm10.actions import Actions_LLVM_10
 from Strategy.RL_strategy.actionspace.CompilerGymLLVMv0.actions import Actions_LLVM_10_0_0
-from Strategy.common import get_instrcount, get_codesize, get_runtime_internal, compile_cpp_to_ll, GenerateBCCode
+from Strategy.common import get_instrcount, get_codesize, get_runtime_internal, compile_cpp_to_ll, GenerateOptimizedLLCode
 
 from gymnasium.spaces import Discrete, Box, Dict
 from torch_geometric.data import Data
@@ -32,7 +32,7 @@ class CompilerEnv(gym.Env):
         self._obs_model = self._config['obs_model']
         self._max_steps = self._config['max_steps']
         self._pass_features = GetNodeFeature(self._ll_code,obs_type=self._obs_type,action_space=self._config['action_space'],llvm_tools_path=self._config['llvm_tools_path'])
-        self._feature_dim = self._get_node_feature_dim()
+        self._feature_dim = self.get_input_dim()
         self.observation_space = self._get_observation_space()
         self._state = None
         self._optimization_flags = ""
@@ -68,7 +68,10 @@ class CompilerEnv(gym.Env):
         return self._state, {}
     
     def get_input_dim(self):
-        return self._get_node_feature_dim()
+        if self._config['isPass2Vec']:
+            return self._get_node_feature_dim()
+        else:
+            return self._get_node_feature_dim() - 1 
     
     def get_output_dim(self):
         return len(self._get_actions())
@@ -143,8 +146,8 @@ class CompilerEnv(gym.Env):
 
             self._process_obs_model(self._state, self._steps, features_vector_np, self._datalist) 
         else:
-            self._ll_code = GenerateBCCode(self._ll_code, shlex.split(self._optimization_flags), self._llvm_tools_path)
-            self.state = np.array([value for value in self._get_node_feature_type().values()], dtype=np.float32)
+            self._ll_code = GenerateOptimizedLLCode(self._ll_code, shlex.split(self._optimization_flags), self._llvm_tools_path)
+            self._state = np.array([value for value in self._get_node_feature_type().values()], dtype=np.float32)
 
     def _process_obs_model(self, state, steps, features_vector, datalist):
         obs_model_functions = {
@@ -237,7 +240,8 @@ class CompilerEnv(gym.Env):
     
     def _init_mlp_state(self, feature_dim):
         features_np = np.array([value for value in self._get_node_feature_type().values()], dtype=np.float32)
-        features_np = np.append(features_np, -1)
+        if self._config['isPass2Vec']:
+            features_np = np.append(features_np, -1)
         return features_np
 
     def _init_transformer_state(self, max_steps, feature_dim):

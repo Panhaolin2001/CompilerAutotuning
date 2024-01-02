@@ -1,4 +1,4 @@
-from ...common import get_codesize, get_instrcount, GenerateASMFile, GenerateBCCode
+from ...common import get_codesize, get_instrcount, GenerateASMFile, GenerateOptimizedLLCode
 from ..obsUtility.InstCount import get_inst_count_obs
 from ..obsUtility.Autophase import get_autophase_obs
 from ..obsUtility.IR2Vec import get_ir2vec_fa_obs, get_ir2vec_sym_obs
