@@ -1,10 +1,8 @@
 import ray
 from ray.rllib.models import ModelCatalog
 from rllib_example.env import CompilerEnv
-from rllib_example.GCN_DQN import GCN
 from ray.rllib.algorithms.dqn.dqn import DQNConfig
 from ray import tune
-from ray import train
 from ray import air
 from ray.tune.registry import register_env
 
@@ -17,26 +15,24 @@ if __name__ == "__main__":
 
     env_name = 'CompilerGYM'
     env_config={
-            "source_file": "/wafer/phl/project/compiler_autotuning/Strategy/ll_file/out.ll",
+            "source_file": "/wafer/phl/project/compiler_autotuning/ll_file/14.x/a.cpp",
             "is_wafer": False,
             "wafer_tools_path": "/wafer/phl/project/wafer-compiler/build/bin",
             "wafer_lower_pass_options": ["-I", "/usr/lib/gcc/x86_64-linux-gnu/11/include",
                                                 "--JsonFilePath", "/wafer/phl/project/wafer-compiler/design.json",
                                                 "--lower-crypto-multi-x86", "--lower-cryptosha1-without-SHA1ISA"],
             "max_steps": 10,
-            "obs_model": "GCN",
-            "reward_type": "CodeSize",
-            "obs_type": "P2VInstCount",
-            "action_space": "llvm-16.x",
-            "llvm_tools_path": "/wafer/phl/project/wafer-compiler/3rdparty/llvm/build-16.x/bin/",
+            "obs_model": "MLP",
+            "reward_type": "IRInstCount",
+            "obs_type": "P2VIR2VSym",
+            "action_space": "llvm-14.x",
+            "llvm_tools_path": "/wafer/phl/project/wafer-compiler/3rdparty/llvm/build-14.x/bin/",
+            "isPass2Vec": True,
     }
 
     register_env('CompilerGYM', lambda config: env_creator(env_config))
 
     env = CompilerEnv(env_config)
-
-    ModelCatalog.register_custom_model("gcn_model", GCN)
-
     
     replay_config = {
             "capacity": 2000,
@@ -56,16 +52,12 @@ if __name__ == "__main__":
         .framework("torch")\
         .training(
             replay_buffer_config=replay_config,
-            model={
-                "custom_model": "gcn_model",
-                "custom_model_config":  {"input_dim": env.get_input_dim(), "output_dim": env.get_output_dim()},
-            },
             _enable_learner_api=False,
             lr=0.001,
             gamma=0.9,
-            # dueling=True,
+            # dueling=False,
         )\
-        .rollouts(num_rollout_workers=8)\
+        .rollouts(num_rollout_workers=0)\
         .rl_module( _enable_rl_module_api=False)\
         .exploration(exploration_config=explore_config)
 
