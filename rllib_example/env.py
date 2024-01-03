@@ -10,10 +10,8 @@ from Strategy.RL_strategy.actionspace.CompilerGymLLVMv0.actions import Actions_L
 from Strategy.common import get_instrcount, get_codesize, get_runtime_internal, compile_cpp_to_ll, GenerateOptimizedLLCode
 
 from gymnasium.spaces import Discrete, Box, Dict
-from torch_geometric.data import Data
 import gymnasium as gym
 import numpy as np
-import copy
 import torch
 import shlex
 
@@ -21,21 +19,21 @@ class CompilerEnv(gym.Env):
     def __init__(self, config):
         super(CompilerEnv, self).__init__()
         self._config = config
-        self._ll_code = compile_cpp_to_ll(self._config['source_file'], llvm_tools_path=self._config['llvm_tools_path'])
-        self._original_ll_code = self._ll_code
         self._llvm_tools_path = self._config['llvm_tools_path']
-        self._reward_type = self._config['reward_type']
-        self._obs_type = self._config['obs_type']
+        self._llvm_version = self._config['llvm_version']
+        self._reward_type = self._config['reward_space']
+        self._obs_type = self._config['observation_type']
+        self._obs_model = self._config['observation_model']
+        self._reward_baseline = self._config['reward_baseline']
+        self._max_steps = self._config['max_steps']
+        self._ll_code = self.benchmark(self._config['source_file'])
+        self._original_ll_code = self._ll_code
         self.action_space = Discrete(self.get_output_dim())
         self._Actions = self._select_actions()
-        self._baseline_perf = self._calculate_baseline_perf()
-        self._obs_model = self._config['obs_model']
-        self._max_steps = self._config['max_steps']
-        self._pass_features = GetNodeFeature(self._ll_code,obs_type=self._obs_type,action_space=self._config['action_space'],llvm_tools_path=self._config['llvm_tools_path'])
+        self._baseline_perf = self._calculate_baseline_perf(self._original_ll_code, self._reward_baseline)
+        self._pass_features = GetNodeFeature(self._ll_code,obs_type=self._obs_type,action_space=self._llvm_version,llvm_tools_path=self._llvm_tools_path)
         self._feature_dim = self.get_input_dim()
         self.observation_space = self._get_observation_space()
-        self._state = None
-        self._optimization_flags = ""
 
     def step(self, action_idx):
         self._steps += 1
@@ -44,7 +42,7 @@ class CompilerEnv(gym.Env):
         allowed_versions = ["llvm-10.0.0", "llvm-10.x"]
         self._optimization_flags = (
             "--enable-new-pm=0 " + " ".join([act.value for act in self._applied_passes])
-            if self._config['action_space'] not in allowed_versions
+            if self._llvm_version not in allowed_versions
             else " ".join([act.value for act in self._applied_passes])
         )
 
@@ -58,6 +56,10 @@ class CompilerEnv(gym.Env):
         terminated = self._steps >= self._max_steps - 1 
         return self._state, self._reward, terminated, False, {}
 
+    def benchmark(self, source_file):
+        benchmark = compile_cpp_to_ll(source_file, llvm_tools_path=self._llvm_tools_path)
+        return benchmark
+
     def reset(self, *, seed=None, options=None):
         self._reward = 0
         self._steps = -1
@@ -70,7 +72,7 @@ class CompilerEnv(gym.Env):
         return self._state, {}
     
     def get_input_dim(self):
-        if self._config['isPass2Vec']:
+        if self._config['isPass2VecObs']:
             return self._get_node_feature_dim()
         else:
             return self._get_node_feature_dim() - 1 
@@ -84,11 +86,8 @@ class CompilerEnv(gym.Env):
                                        "edge_index": Box(low=0, high=self._max_steps, shape=(2,self._max_steps), dtype=np.int64)}),  # TODO: add edge feature.
 
             "MLP": Box(low=float('-inf'), high=float('inf'), shape=(self._feature_dim,), dtype=np.float32),
-            "Transformer": None, # TODO: add Transformer observation space.
-            "T-GCN": None,       # TODO: add T-GCN observation space.
-            "GRNN": None,        # TODO: add GRNN observation space.
         }
-        selected_observation_space = observation_space_mappings.get(self._config['obs_model'])
+        selected_observation_space = observation_space_mappings.get(self._obs_model)
         if selected_observation_space is None:
             raise ValueError(f"Unknown obs model: {selected_observation_space}")
         return selected_observation_space
@@ -103,21 +102,35 @@ class CompilerEnv(gym.Env):
             "llvm-10.x": Actions_LLVM_10,
             "llvm-10.0.0": Actions_LLVM_10_0_0
         }
-        selected_actions = action_space_mappings.get(self._config['action_space'])
+        selected_actions = action_space_mappings.get(self._llvm_version)
         if selected_actions is None:
-            raise ValueError(f"Unknown action space: {self._config['action_space']}, please choose 'llvm-16.x', 'llvm-14.x', 'llvm-10.x', 'llvm-10.0.0' ")
+            raise ValueError(f"Unknown action space: {self._llvm_version}, please choose 'llvm-16.x', 'llvm-14.x', 'llvm-10.x', 'llvm-10.0.0' ")
         return selected_actions
 
-    def _calculate_baseline_perf(self):
+    def _calculate_baseline_perf(self, ll_code, reward_baseline):
         reward_functions = {
-            "IRInstCount": lambda: get_instrcount(self._original_ll_code, "-Oz", llvm_tools_path=self._llvm_tools_path),
-            "CodeSize": lambda: get_codesize(self._original_ll_code, "-Oz", llvm_tools_path=self._llvm_tools_path),
-            "RunTime": lambda: get_runtime_internal(self._original_ll_code, "-O3", llvm_tools_path=self._llvm_tools_path)
+            "IRInstCountOz": lambda: get_instrcount(ll_code, "-Oz", llvm_tools_path=self._llvm_tools_path),
+            "IRInstCountO3": lambda: get_instrcount(ll_code, "-O3", llvm_tools_path=self._llvm_tools_path),
+            "IRInstCountO2": lambda: get_instrcount(ll_code, "-O2", llvm_tools_path=self._llvm_tools_path),
+            "IRInstCountO1": lambda: get_instrcount(ll_code, "-O1", llvm_tools_path=self._llvm_tools_path),
+            "IRInstCountO0": lambda: get_instrcount(ll_code, "-O0", llvm_tools_path=self._llvm_tools_path),
+            "CodeSizeOz": lambda: get_codesize(ll_code, "-Oz", llvm_tools_path=self._llvm_tools_path),
+            "CodeSizeO3": lambda: get_codesize(ll_code, "-O3", llvm_tools_path=self._llvm_tools_path),
+            "CodeSizeO2": lambda: get_codesize(ll_code, "-O2", llvm_tools_path=self._llvm_tools_path),
+            "CodeSizeO1": lambda: get_codesize(ll_code, "-O1", llvm_tools_path=self._llvm_tools_path),
+            "CodeSizeO0": lambda: get_codesize(ll_code, "-O0", llvm_tools_path=self._llvm_tools_path),
+            "RunTimeOz": lambda: get_runtime_internal(ll_code, "-Oz", llvm_tools_path=self._llvm_tools_path),
+            "RunTimeO3": lambda: get_runtime_internal(ll_code, "-O3", llvm_tools_path=self._llvm_tools_path),
+            "RunTimeO2": lambda: get_runtime_internal(ll_code, "-O2", llvm_tools_path=self._llvm_tools_path),
+            "RunTimeO1": lambda: get_runtime_internal(ll_code, "-O1", llvm_tools_path=self._llvm_tools_path),
+            "RunTimeO0": lambda: get_runtime_internal(ll_code, "-O0", llvm_tools_path=self._llvm_tools_path),
         }
 
-        reward_function = reward_functions.get(self._config['reward_type'])
+        reward_function = reward_functions.get(reward_baseline)
         if reward_function is None:
-            raise ValueError(f"Unknown reward type: {self._config['reward_type']}, please choose 'IRInstCount', 'CodeSize', 'RunTime'")
+            raise ValueError(f"Unknown reward_baseline: {reward_baseline}, please choose 'IRInstCountOz', 'IRInstCountO3', \
+                             'IRInstCountO2','IRInstCountO1','IRInstCountO0','CodeSizeOz', 'CodeSizeO3','CodeSizeO2', \
+                             'CodeSizeO1','CodeSizeO0','RunTimeOz','RunTimeO3','RunTimeO2','RunTimeO1','RunTimeO0'")
 
         baseline_perf = reward_function()
         return baseline_perf
@@ -129,16 +142,16 @@ class CompilerEnv(gym.Env):
             "RunTime": lambda: get_runtime_internal(self._original_ll_code, optimization_flags, llvm_tools_path=self._llvm_tools_path)
         }
 
-        perf_function = perf_functions.get(self._config['reward_type'])
+        perf_function = perf_functions.get(self._reward_type)
         if perf_function is None:
-            raise ValueError(f"Unknown reward type: {self._config['reward_type']}, please choose 'IRInstCount', 'CodeSize', 'RunTime'")
+            raise ValueError(f"Unknown reward type: {self._reward_type}, please choose 'IRInstCount', 'CodeSize', 'RunTime'")
 
         current_perf = perf_function()
         return current_perf
 
     def _update_state(self, action_idx):
 
-        if self._config['isPass2Vec']:
+        if self._config['isPass2VecObs']:
             action = self._get_action_name(action_idx)
             features = self._pass_features[action.name]
             features_vector = torch.tensor([value for value in features.values()], dtype=torch.float)
@@ -155,9 +168,6 @@ class CompilerEnv(gym.Env):
         obs_model_functions = {
             "GCN": lambda: self._process_gcn(state, steps, features_vector),
             "MLP": lambda: self._process_mlp(state, steps, features_vector),
-            "Transformer": lambda: self._process_transformer(state, steps, features_vector),
-            "T-GCN": lambda: self._process_tgcn(state, steps, features_vector, datalist),
-            "GRNN": lambda: self._process_grnn(state, steps, features_vector, datalist),
         }
 
         obs_model_function = obs_model_functions.get(self._obs_model)
@@ -176,25 +186,6 @@ class CompilerEnv(gym.Env):
         state += features_vector # TODO: 
         state /= (steps + 1)
 
-    def _process_transformer(self, state, steps, features_vector):
-        state[steps] = features_vector
-
-    def _process_tgcn(self, state, steps, features_vector, datalist):
-        data = copy.deepcopy(state[-1])
-        data.x[steps] = features_vector
-        if steps >= 1:
-            new_edge = torch.tensor([[steps - 1], [steps]], dtype=torch.long)
-            data.edge_index = torch.cat([data.edge_index, new_edge], dim=1)
-        datalist.append(data)
-
-    def _process_grnn(self, state, steps, features_vector, datalist):
-        data = copy.deepcopy(state[-1])
-        data.x[steps] = features_vector
-        if steps >= 1:
-            new_edge = torch.tensor([[steps - 1], [steps]], dtype=torch.long)
-            data.edge_index = torch.cat([data.edge_index, new_edge], dim=1)
-        datalist.append(data)
-
     def _get_action_name(self, action_idx):
         return list(self._Actions)[action_idx]
 
@@ -204,31 +195,28 @@ class CompilerEnv(gym.Env):
             "llvm-14.x": list(Actions_LLVM_14),
             "llvm-10.x": list(Actions_LLVM_10),
             "llvm-10.0.0": list(Actions_LLVM_10_0_0),
-        }.get(self._config['action_space'], [])
+        }.get(self._llvm_version, [])
 
     def _get_node_feature_type(self):
         return {
-            "P2VInstCount": lambda: get_inst_count_obs(self._ll_code, self._config['action_space']),
-            "P2VAutoPhase": lambda: get_autophase_obs(self._ll_code, self._config['action_space']),
+            "P2VInstCount": lambda: get_inst_count_obs(self._ll_code, self._llvm_version),
+            "P2VAutoPhase": lambda: get_autophase_obs(self._ll_code, self._llvm_version),
             "P2VIR2VFa": lambda: get_ir2vec_fa_obs(self._ll_code),
             "P2VIR2VSym": lambda: get_ir2vec_sym_obs(self._ll_code)
-        }.get(self._config['obs_type'], [])()
+        }.get(self._obs_type, [])()
 
     def _init_state(self):
-        return self._get_init_state(self._obs_model, self._max_steps, self._feature_dim, self._original_ll_code, self._config['action_space'], self._datalist)
+        return self._get_init_state(self._obs_model, self._max_steps, self._feature_dim, self._original_ll_code, self._llvm_version, self._datalist)
             
     def _get_init_state(self, obs_model, max_steps, feature_dim, ll_file, action_space, datalist):
         init_state_functions = {
             "GCN": lambda: self._init_gcn_state(max_steps, feature_dim, ll_file, action_space),
             "MLP": lambda: self._init_mlp_state(feature_dim),
-            "Transformer": lambda: self._init_transformer_state(max_steps, feature_dim),
-            "T-GCN": lambda: self._init_tgcn_state(max_steps, feature_dim, datalist),
-            "GRNN": lambda: self._init_grnn_state(max_steps, feature_dim, datalist),
         }
 
         init_state_function = init_state_functions.get(obs_model)
         if init_state_function is None:
-            raise ValueError(f"Unknown obs model: {obs_model}, please choose 'GCN', 'MLP', 'Transformer', 'T-GCN', 'GRNN' ")
+            raise ValueError(f"Unknown obs model: {obs_model}, please choose 'GCN', 'MLP' ")
 
         return init_state_function()
 
@@ -242,23 +230,6 @@ class CompilerEnv(gym.Env):
     
     def _init_mlp_state(self, feature_dim):
         features_np = np.array([value for value in self._get_node_feature_type().values()], dtype=np.float32)
-        if self._config['isPass2Vec']:
+        if self._config['isPass2VecObs']:
             features_np = np.append(features_np, -1)
         return features_np
-
-    def _init_transformer_state(self, max_steps, feature_dim):
-        return torch.zeros((max_steps, feature_dim), dtype=torch.float)
-        
-    def _init_tgcn_state(self, max_steps, feature_dim, datalist):
-        x = torch.zeros((max_steps, feature_dim), dtype=torch.float)
-        edge_index = torch.empty((2, 0), dtype=torch.long)
-        data = Data(x=x, edge_index=edge_index)
-        datalist.append(data)
-        return datalist
-
-    def _init_grnn_state(self, max_steps, feature_dim, datalist):
-        x = torch.zeros((max_steps, feature_dim), dtype=torch.float)
-        edge_index = torch.empty((2, 0), dtype=torch.long)
-        data = Data(x=x, edge_index=edge_index)
-        datalist.append(data)
-        return datalist
