@@ -22,6 +22,7 @@ class CompilerEnv(gym.Env):
         super(CompilerEnv, self).__init__()
         self._config = config
         self._ll_code = compile_cpp_to_ll(self._config['source_file'], llvm_tools_path=self._config['llvm_tools_path'])
+        self._original_ll_code = self._ll_code
         self._llvm_tools_path = self._config['llvm_tools_path']
         self._reward_type = self._config['reward_type']
         self._obs_type = self._config['obs_type']
@@ -39,7 +40,6 @@ class CompilerEnv(gym.Env):
     def step(self, action_idx):
         self._steps += 1
         self._applied_passes.append(self._get_action_name(action_idx))
-        self._update_state(action_idx)
 
         allowed_versions = ["llvm-10.0.0", "llvm-10.x"]
         self._optimization_flags = (
@@ -47,6 +47,8 @@ class CompilerEnv(gym.Env):
             if self._config['action_space'] not in allowed_versions
             else " ".join([act.value for act in self._applied_passes])
         )
+
+        self._update_state(action_idx)
 
         current_perf = self._calculate_current_perf(self._optimization_flags)
 
@@ -62,6 +64,7 @@ class CompilerEnv(gym.Env):
         self._current_perf = self._baseline_perf
         self._applied_passes = []
         self._datalist = []
+        self._optimization_flags = ""
         self._state = self._init_state()
 
         return self._state, {}
@@ -107,9 +110,9 @@ class CompilerEnv(gym.Env):
 
     def _calculate_baseline_perf(self):
         reward_functions = {
-            "IRInstCount": lambda: get_instrcount(self._ll_code, "-Oz", llvm_tools_path=self._llvm_tools_path),
-            "CodeSize": lambda: get_codesize(self._ll_code, "-Oz", llvm_tools_path=self._llvm_tools_path),
-            "RunTime": lambda: get_runtime_internal(self._ll_code, "-O3", llvm_tools_path=self._llvm_tools_path)
+            "IRInstCount": lambda: get_instrcount(self._original_ll_code, "-Oz", llvm_tools_path=self._llvm_tools_path),
+            "CodeSize": lambda: get_codesize(self._original_ll_code, "-Oz", llvm_tools_path=self._llvm_tools_path),
+            "RunTime": lambda: get_runtime_internal(self._original_ll_code, "-O3", llvm_tools_path=self._llvm_tools_path)
         }
 
         reward_function = reward_functions.get(self._config['reward_type'])
@@ -121,9 +124,9 @@ class CompilerEnv(gym.Env):
 
     def _calculate_current_perf(self, optimization_flags):
         perf_functions = {
-            "IRInstCount": lambda: get_instrcount(self._ll_code, optimization_flags, llvm_tools_path=self._llvm_tools_path),
-            "CodeSize": lambda: get_codesize(self._ll_code, optimization_flags, llvm_tools_path=self._llvm_tools_path),
-            "RunTime": lambda: get_runtime_internal(self._ll_code, optimization_flags, llvm_tools_path=self._llvm_tools_path)
+            "IRInstCount": lambda: get_instrcount(self._original_ll_code, optimization_flags, llvm_tools_path=self._llvm_tools_path),
+            "CodeSize": lambda: get_codesize(self._original_ll_code, optimization_flags, llvm_tools_path=self._llvm_tools_path),
+            "RunTime": lambda: get_runtime_internal(self._original_ll_code, optimization_flags, llvm_tools_path=self._llvm_tools_path)
         }
 
         perf_function = perf_functions.get(self._config['reward_type'])
@@ -145,7 +148,7 @@ class CompilerEnv(gym.Env):
 
             self._process_obs_model(self._state, self._steps, features_vector_np, self._datalist) 
         else:
-            self._ll_code = GenerateOptimizedLLCode(self._ll_code, shlex.split(self._optimization_flags), self._llvm_tools_path)
+            self._ll_code = GenerateOptimizedLLCode(self._original_ll_code, shlex.split(self._optimization_flags), self._llvm_tools_path)
             self._state = np.array([value for value in self._get_node_feature_type().values()], dtype=np.float32)
 
     def _process_obs_model(self, state, steps, features_vector, datalist):
@@ -212,7 +215,7 @@ class CompilerEnv(gym.Env):
         }.get(self._config['obs_type'], [])()
 
     def _init_state(self):
-        return self._get_init_state(self._obs_model, self._max_steps, self._feature_dim, self._ll_code, self._config['action_space'], self._datalist)
+        return self._get_init_state(self._obs_model, self._max_steps, self._feature_dim, self._original_ll_code, self._config['action_space'], self._datalist)
             
     def _get_init_state(self, obs_model, max_steps, feature_dim, ll_file, action_space, datalist):
         init_state_functions = {
