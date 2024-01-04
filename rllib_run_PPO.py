@@ -1,9 +1,8 @@
 import ray
 from ray.rllib.models import ModelCatalog
-from rllib_example.env import CompilerEnv
-from rllib_example.GCN_PPO import GCN
+from AdaptRLlib.env.LLVMEnv.env import CompilerEnv
+from AdaptRLlib.custom_model.GCN_PPO import GCN
 from ray.rllib.algorithms import ppo
-from ray.rllib.algorithms.dqn.dqn import DQNConfig
 from ray import tune
 from ray import train
 from ray import air
@@ -18,18 +17,15 @@ if __name__ == "__main__":
 
     env_name = 'CompilerGYM'
     env_config={
-            "source_file": "/wafer/phl/project/wafer-compiler/tools/waferfrontend/test/foo.cpp",
-            "is_wafer": True,
-            "wafer_tools_path": "/wafer/phl/project/wafer-compiler/build/bin",
-            "wafer_lower_pass_options": ["-I", "/usr/lib/gcc/x86_64-linux-gnu/11/include",
-                                                "--JsonFilePath", "/wafer/phl/project/wafer-compiler/design.json",
-                                                "--lower-crypto-multi-x86", "--lower-cryptosha1-without-SHA1ISA"],
+            "source_file": "/wafer/phl/project/compiler_autotuning/ll_file/16.x/out.ll",
             "max_steps": 10,
-            "obs_model": "GCN",
-            "reward_type": "CodeSize",
-            "obs_type": "P2VInstCount",
-            "action_space": "llvm-16.x",
+            "reward_space": "IRInstCount",
+            "reward_baseline": "IRInstCountOz",
+            "observation_type": "P2VInstCount",
+            "observation_model": "MLP",
+            "llvm_version": "llvm-16.x",
             "llvm_tools_path": "/wafer/phl/project/wafer-compiler/3rdparty/llvm/build-16.x/bin/",
+            "isPass2VecObs": False,
     }
 
     register_env('CompilerGYM', lambda config: env_creator(env_config))
@@ -42,10 +38,10 @@ if __name__ == "__main__":
         .environment(env=env_name, disable_env_checking=True)\
         .framework("torch")\
         .training(
-            model={
-                "custom_model": "gcn_model",
-                "custom_model_config": {"input_dim": env.get_input_dim(), "output_dim": env.get_output_dim()},
-            },
+            # model={
+            #     "custom_model": "gcn_model",
+            #     "custom_model_config": {"input_dim": env.get_input_dim(), "output_dim": env.get_output_dim()},
+            # },
             _enable_learner_api=False
         )\
         .rollouts(num_rollout_workers=16, create_env_on_local_worker=True)\

@@ -4,19 +4,20 @@ from torch_geometric.data import Data
 from torch_geometric.data import Batch
 from torch_geometric.nn import GCNConv
 from torch_geometric.nn import global_mean_pool as gap
-from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
+from ray.rllib.algorithms.dqn.dqn_torch_model import DQNTorchModel
 
-torch.manual_seed(1234)
-
-class GCN(TorchModelV2, torch.nn.Module):
+class GCN(DQNTorchModel):
     def __init__(self, obs_space, action_space, num_outputs, model_config, name, **customized_model_kwargs):
-        TorchModelV2.__init__(self, obs_space, action_space, num_outputs, model_config, name)
+        DQNTorchModel.__init__(self, obs_space, action_space, num_outputs, model_config, name, **customized_model_kwargs)
         torch.nn.Module.__init__(self)
+
+        self.advantage_module = torch.nn.Sequential()
+        self.value_module = torch.nn.Sequential()
 
         self.databatch = None
 
-        self.input_dim = customized_model_kwargs['input_dim']
-        self.output_dim = customized_model_kwargs['output_dim']
+        self.input_dim = model_config['custom_model_config']['input_dim']
+        self.output_dim = model_config['custom_model_config']['output_dim']
 
         self.conv1 = GCNConv(self.input_dim, 128)
         self.conv2 = GCNConv(128, 128)
@@ -43,6 +44,7 @@ class GCN(TorchModelV2, torch.nn.Module):
         x = self.line2(x)
         x = self.act(x)
         x = self.line3(x)
+
         return x, state
 
     def value_function(self):
